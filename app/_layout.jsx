@@ -1,10 +1,13 @@
-import React from "react";
+import { Stack } from "expo-router";
+import { useHideNavigationBar } from '../hooks/useNavigationBar';
 
-export default function Layout({ children }) {
+export default function Layout() {
+    useHideNavigationBar(); // Chama o hook para esconder a barra
     return (
-        <div>
-            <header>OlinxRA App</header>
-            <main>{children}</main>
-        </div>
+        <Stack
+            screenOptions={{
+                headerShown: false,
+            }}
+        />
     );
 }
