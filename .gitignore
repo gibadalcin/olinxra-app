@@ -1,0 +1,27 @@
+# Dependências
+node_modules/
+
+# Ambiente
+.env
+*.env
+
+# Build e cache
+dist/
+temp/
+*.bak
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Exceções para VSCode
+!.vscode/extensions.json
+
+# Expo
+.expo/
