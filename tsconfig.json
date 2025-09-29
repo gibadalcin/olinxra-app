@@ -2,9 +2,19 @@
   "extends": "expo-module-scripts/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "baseUrl": ".",
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@hooks/*": [
+        "hooks/*"
+      ],
+      "@components/*": [
+        "components/*"
+      ],
+      "@constants/*": [
+        "constants/*"
       ]
     }
   },

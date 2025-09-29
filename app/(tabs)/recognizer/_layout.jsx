@@ -1,10 +1,11 @@
-import React from "react";
 import { View } from "react-native";
+import { useHideNavigationBar } from '@hooks/useNavigationBar';
+import { Stack } from 'expo-router'; // Importe o Stack
 
-export default function RecognizerLayout({ children }) {
+export default function RecognizerLayout() {
+    useHideNavigationBar();
+
     return (
-        <View style={{ flex: 1 }}>
-            {children}
-        </View>
+        <Stack screenOptions={{ headerShown: false }} />
     );
 }

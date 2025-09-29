@@ -1,5 +1,5 @@
 import { Stack } from "expo-router";
-import { useHideNavigationBar } from '../hooks/useNavigationBar';
+import { useHideNavigationBar } from '@hooks/useNavigationBar';
 
 export default function Layout() {
     useHideNavigationBar();
