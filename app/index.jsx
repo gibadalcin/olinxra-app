@@ -2,8 +2,6 @@ import React, { useEffect, useState } from "react";
 import { View, Animated, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useHideNavigationBar } from '../hooks/useNavigationBar';
-
 
 // Esconde o cabeçalho da Stack para esta página
 export const options = {
@@ -14,7 +12,6 @@ export default function Splash() {
     const [progress, setProgress] = useState(0);
     const fadeAnim = useState(new Animated.Value(1))[0];
     const router = useRouter();
-    useHideNavigationBar();
 
     useEffect(() => {
         const interval = setInterval(() => {
