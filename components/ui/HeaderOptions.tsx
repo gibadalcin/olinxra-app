@@ -1,31 +1,35 @@
 import React from 'react';
-import { ImageSourcePropType, useColorScheme, View, Text, Image, StyleSheet } from 'react-native';
-import { Colors } from '../../constants/Colors';
+import { ImageSourcePropType, View, Text, Image, StyleSheet } from 'react-native';
+// Colors será passado como parâmetro
+
+// Novo componente que lida com o hook
+function CustomHeaderTitle({ title, image, headerTintColor }: { title: string, image?: ImageSourcePropType, headerTintColor: string }) {
+    return (
+        <View style={styles.headerContainer}>
+            {image && (
+                <Image
+                    source={image}
+                    style={styles.headerImage}
+                />
+            )}
+            <Text style={[styles.headerTitle, { color: headerTintColor }]}>{title}</Text>
+        </View>
+    );
+}
 
 export function getHeaderOptions(
     title: string,
-    image?: ImageSourcePropType // Adicione um parâmetro opcional para a imagem
+    image: ImageSourcePropType | undefined,
+    headerTintColor: string,
+    headerBackgroundColor: string
 ) {
-    const colorScheme = useColorScheme();
-    const headerBackgroundColor = Colors[colorScheme ?? 'light'].headerBg;
-    const headerTintColor = Colors[colorScheme ?? 'light'].headerText;
-
     return {
-        title,
+        title: title,
         headerShown: true,
-        headerTitle: () => (
-            <View style={[styles.headerContainer, { backgroundColor: headerBackgroundColor }]}>
-                <View style={styles.headerContainer}>
-                    {image && (
-                        <Image
-                            source={image}
-                            style={styles.headerImage}
-                        />
-                    )}
-                    <Text style={[styles.headerTitle, { color: headerTintColor }]}>{title}</Text>
-                </View>
-            </View>
-        ),
+        headerTitle: () => <CustomHeaderTitle title={title} image={image} headerTintColor={headerTintColor} />,
+        headerStyle: {
+            backgroundColor: headerBackgroundColor,
+        },
     };
 }
 
@@ -33,19 +37,17 @@ const styles = StyleSheet.create({
     headerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        textAlign: 'center',
-        width: '100%',
+        justifyContent: 'center',
+        color: 'black',
     },
     headerImage: {
         width: 32,
-        height: 48,
+        height: 32,
         marginRight: 8,
-        resizeMode: 'cover',
+        resizeMode: 'contain',
     },
     headerTitle: {
         fontSize: 18,
-        fontWeight: '400',
-        height: 44,
-        verticalAlign: 'middle',
+        fontWeight: 'bold',
     },
 });

@@ -1,14 +1,16 @@
 import React from "react";
-import { View, TouchableOpacity } from "react-native";
+import { TouchableOpacity } from "react-native";
 import { useRouter, useSegments } from "expo-router";
-import { MaterialIcons, Ionicons, SimpleLineIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { ThemedView } from "./ThemedView";
+import { ThemedText } from "./ThemedText";
 
 const icons = [
     { name: "home", label: "Home", route: "/(tabs)/", family: Ionicons },
-    { name: "camera", label: "Recognizer", route: "/(tabs)/recognizer", family: Ionicons },
-    { name: "compass", label: "Explorer", route: "/(tabs)/explorer", family: Ionicons },
-    { name: "help-circle", label: "Help", route: "/(tabs)/help", family: Ionicons },
-    { name: "settings", label: "Options", route: "/(tabs)/options", family: Ionicons },
+    { name: "camera", label: "Capturar", route: "/(tabs)/recognizer", family: Ionicons },
+    { name: "compass", label: "Explorar", route: "/(tabs)/explorer", family: Ionicons },
+    { name: "help-circle", label: "Ajuda", route: "/(tabs)/help", family: Ionicons },
+    { name: "settings", label: "Opções", route: "/(tabs)/options", family: Ionicons },
 ];
 
 const activeColor = "#012E57";
@@ -25,18 +27,18 @@ export default function CustomTabBar({ state }) {
     }
 
     return (
-        <View
+        <ThemedView
             style={{
                 flexDirection: "row",
                 justifyContent: "space-around",
                 alignItems: "center",
                 height: 64,
-                backgroundColor: "#fff",
+                backgroundColor: "#FCFCFC",
                 borderTopWidth: 1,
                 borderTopColor: "#B3CDE0",
             }}
         >
-            {icons.map((icon, index) => {
+            {icons.map((icon) => {
                 const routeSegment = icon.route.split("/").filter(Boolean).pop();
                 const isActive = (icon.route === "/(tabs)/" && activeRoute === "index") || activeRoute === routeSegment;
 
@@ -44,7 +46,7 @@ export default function CustomTabBar({ state }) {
                     <TouchableOpacity
                         key={icon.name}
                         onPress={() => router.replace(icon.route)}
-                        style={{ flex: 1, alignItems: "center" }}
+                        style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
                     >
                         <icon.family
                             name={icon.name}
@@ -52,9 +54,19 @@ export default function CustomTabBar({ state }) {
                             color={isActive ? activeColor : inactiveColor}
                             style={{ opacity: isActive ? 1 : inactiveOpacity }}
                         />
+                        <ThemedText
+                            style={{
+                                fontSize: 10,
+                                color: isActive ? activeColor : inactiveColor,
+                                opacity: isActive ? 1 : inactiveOpacity,
+                                marginTop: -2,
+                            }}
+                        >
+                            {icon.label}
+                        </ThemedText>
                     </TouchableOpacity>
                 );
             })}
-        </View>
+        </ThemedView>
     );
 }

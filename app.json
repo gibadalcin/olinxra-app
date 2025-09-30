@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "olinxra-app",
+    "slug": "olinxra-app",
+    "scheme": "olinxra-app",
+    "version": "1.0.0",
+    "sdkVersion": "54.0.0"
+  }
+}

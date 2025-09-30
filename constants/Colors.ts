@@ -17,7 +17,7 @@ const colorDark_01 = '#000000';
 const colorDark_02 = '#687076';
 const colorDark_10 = '#012E57';
 const colorDark_20 = '#e20202ff';
-const colorLight_01 = '#ffffff';
+const colorLight_01 = '#fcfcfc';
 const colorLight_10 = '#007AFF';
 
 
@@ -33,11 +33,12 @@ export const Colors = {
     tabIconSelected: primaryColorDark,
     splashBackground: secondaryColorDark,
     splashProgress: colorLight_01,
-    splashProgressBg: primaryColorLight,
+    splashProgressBg: secondaryColorLight,
     highlight: highlightColor,
     textLink: colorTitleDark,
     headerText: primaryColorDark,
     headerBg: colorLight_01,
+    tabBarBg: colorLight_01,
   },
   dark: {
     background: primaryColorDark,
@@ -66,7 +67,7 @@ export const Colors = {
     grey: colorDark_02,
     blueLight: colorLight_10,
     blueDark: colorDark_10,
-    light: colorLight_01,
+    light: secondaryColorLight,
     red: colorDark_20
   },
 };
