@@ -20,14 +20,15 @@ export default function RecognizerHome() {
     const [torchOn, setTorchOn] = useState(false);
     const [zoomLevel, setZoomLevel] = useState(0);
 
-    // Handler de gesto de pinça otimizado
+    // Handler de gesto de pinça otimizado (DESCOMENTE PARA DEPLOY NATIVO)
+    /*
     const pinchGesture = Gesture.Pinch()
         .onUpdate((event) => {
-            // Calcula o zoom diretamente do gesto, limitando o valor
             let nextZoom = (event.scale - 1) / 4;
             nextZoom = Math.max(MIN_ZOOM, Math.min(nextZoom, MAX_ZOOM));
             setZoomLevel(nextZoom);
         });
+    */
 
     // Helpers de permissão
     const checkAllPermissions = useCallback(async () => {
@@ -92,6 +93,22 @@ export default function RecognizerHome() {
 
     return (
         <View style={styles.container}>
+            {/* DESCOMENTE PARA DEPLOY NATIVO */}
+            {/*
+            <GestureDetector gesture={pinchGesture}>
+                <View style={styles.camera}>
+                    <CameraView
+                        ref={cameraRef}
+                        style={{ width: "100%", height: "100%" }}
+                        facing="back"
+                        torch={torchOn ? "on" : "off"}
+                        zoom={zoomLevel}
+                    />
+                    <CameraMarkers />
+                </View>
+            </GestureDetector>
+            */}
+            {/* COMENTE PARA DEPLOY NATIVO */}
             <View style={styles.camera}>
                 <CameraView
                     ref={cameraRef}
@@ -102,6 +119,7 @@ export default function RecognizerHome() {
                 />
                 <CameraMarkers />
             </View>
+            {/* COMENTE PARA DEPLOY NATIVO */}
             <Slider
                 style={{ width: 200, alignSelf: 'center', marginTop: 12 }}
                 minimumValue={MIN_ZOOM}
