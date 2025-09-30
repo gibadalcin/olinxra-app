@@ -8,7 +8,8 @@ export function useHideNavigationBar() {
   useEffect(() => {
     // Esconde a barra imediatamente na montagem do componente
     NavigationBar.setVisibilityAsync('hidden');
-    NavigationBar.setBehaviorAsync('overlay-swipe');
+    // Remova ou comente a linha abaixo para evitar o warning:
+    // NavigationBar.setBehaviorAsync('overlay-swipe');
 
     // Listener para o estado do aplicativo
     const subscription = AppState.addEventListener('change', nextAppState => {
