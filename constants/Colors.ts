@@ -23,7 +23,7 @@ const colorLight_10 = '#007AFF';
 
 export const Colors = {
   light: {
-    background: colorLight_01,
+    background: secondaryColorLight,
     text: colorTextLight,
     title: colorTitleLight,
     slogan: sloganColor,
@@ -67,6 +67,7 @@ export const Colors = {
     grey: colorDark_02,
     blueLight: colorLight_10,
     blueDark: colorDark_10,
+    blueSoft: colorTitleDark,
     light: secondaryColorLight,
     red: colorDark_20
   },
