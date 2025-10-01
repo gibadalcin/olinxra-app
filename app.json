@@ -4,6 +4,12 @@
     "slug": "olinxra-app",
     "scheme": "olinxra-app",
     "version": "1.0.0",
-    "sdkVersion": "54.0.0"
+    "sdkVersion": "54.0.0",
+    "android": {
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    }
   }
 }

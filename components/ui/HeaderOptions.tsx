@@ -1,21 +1,23 @@
 import React from 'react';
 import { ImageSourcePropType, View, Text, Image, StyleSheet } from 'react-native';
-// Colors será passado como parâmetro
 
-// Novo componente que lida com o hook
-function CustomHeaderTitle({ title, image, headerTintColor }: { title: string, image?: ImageSourcePropType, headerTintColor: string }) {
-    return (
-        <View style={styles.headerContainer}>
-            {image && (
-                <Image
-                    source={image}
-                    style={styles.headerImage}
-                />
-            )}
-            <Text style={[styles.headerTitle, { color: headerTintColor }]}>{title}</Text>
-        </View>
-    );
-}
+type CustomHeaderTitleProps = {
+    title: string;
+    image?: ImageSourcePropType;
+    headerTintColor: string;
+};
+
+const CustomHeaderTitle = React.memo(({ title, image, headerTintColor }: CustomHeaderTitleProps) => (
+    <View style={styles.headerContainer}>
+        {image && (
+            <Image
+                source={image}
+                style={styles.headerImage}
+            />
+        )}
+        <Text style={[styles.headerTitle, { color: headerTintColor }]}>{title}</Text>
+    </View>
+));
 
 export function getHeaderOptions(
     title: string,
@@ -24,7 +26,7 @@ export function getHeaderOptions(
     headerBackgroundColor: string
 ) {
     return {
-        title: title,
+        title,
         headerShown: true,
         headerTitle: () => <CustomHeaderTitle title={title} image={image} headerTintColor={headerTintColor} />,
         headerStyle: {
@@ -38,7 +40,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        color: 'black',
     },
     headerImage: {
         width: 32,

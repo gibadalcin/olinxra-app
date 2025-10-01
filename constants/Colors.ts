@@ -1,7 +1,4 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
+// Paleta centralizada para temas light, dark e global
 
 const primaryColorLight = '#B3CDE0';
 const primaryColorDark = '#012E57';
@@ -15,11 +12,14 @@ const colorTitleDark = '#B3CDE0';
 const sloganColor = '#012E57';
 const colorDark_01 = '#000000';
 const colorDark_02 = '#687076';
-const colorDark_10 = '#012E57';
+const colorDark_10 = primaryColorDark;
 const colorDark_20 = '#e20202ff';
 const colorLight_01 = '#fcfcfc';
 const colorLight_10 = '#007AFF';
 
+
+
+export type ThemeColors = typeof Colors;
 
 export const Colors = {
   light: {
@@ -51,7 +51,7 @@ export const Colors = {
     tabIconSelected: primaryColorLight,
     splashBackground: primaryColorDark,
     splashProgress: primaryColorLight,
-    splashProgressBg: '#687076',
+    splashProgressBg: colorDark_02,
     highlight: highlightColor,
     textLink: secondaryColorDark,
     headerText : primaryColorLight,

@@ -3,7 +3,7 @@ import { Modal, View, Image, StyleSheet, Pressable, Text, Alert } from 'react-na
 import { Colors } from '@/constants/Colors';
 import { useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useSaveToGallery } from '@/hooks/useSaveToGallery';
+import { saveToGallery } from '@/hooks/useSaveToGallery';
 import { LoadingCaptureModal } from './LoadingCaptureModal';
 import { compareLogo } from '@/hooks/useLogoCompare';
 import { NoContentToDisplayModal } from './NoContentToDisplay';
@@ -11,9 +11,10 @@ import { NoContentToDisplayModal } from './NoContentToDisplay';
 type Props = {
     visible: boolean;
     imageUri: string;
-    onSave: () => void;
+    onSave?: () => void;
     onCancel: () => void;
     saveDisabled?: boolean;
+    imageSource?: 'camera' | 'gallery' | null;
 };
 
 export function ImageDecisionModal({
@@ -21,15 +22,18 @@ export function ImageDecisionModal({
     imageUri,
     onCancel,
     saveDisabled,
+    imageSource,
+    onSave,
 }: Props) {
     const { width } = useWindowDimensions();
     const imageWidth = width * 0.8;
-    const { saveToGallery } = useSaveToGallery();
     const [loading, setLoading] = useState(false);
     const [showNoContentModal, setShowNoContentModal] = useState(false);
+    const canSave = !saveDisabled && imageSource === 'camera';
 
-    async function handleCompare() {
+    const handleCompare = React.useCallback(async () => {
         setLoading(true);
+        let shouldCancel = true;
         try {
             const result = await compareLogo(imageUri);
             if ((result.status === 'cached' || result.status === 'recognized') && result.data?.name) {
@@ -41,42 +45,39 @@ export function ImageDecisionModal({
                     'Conteúdo reconhecido!',
                     `Nome: ${result.data.name}${confidence}`
                 );
-                onCancel(); // Fecha o modal
             } else if (result.status === 'not_found') {
                 setShowNoContentModal(true);
-                onCancel(); // Fecha o modal
+                shouldCancel = false;
             } else if (result.status === 'error') {
                 Alert.alert('Erro', result.error || 'Falha na comunicação com o servidor.');
-                onCancel(); // Fecha o modal
             } else {
                 Alert.alert('Erro', 'Resposta inesperada do servidor.');
-                onCancel(); // Fecha o modal
             }
         } catch (error) {
             Alert.alert('Erro', 'Falha na comunicação com o servidor.');
-            onCancel(); // Fecha o modal
         } finally {
             setLoading(false);
+            if (shouldCancel) onCancel();
         }
-    }
+    }, [imageUri, onCancel]);
 
-    async function handleSave() {
-        if (saveDisabled) return;
+    const handleSave = React.useCallback(async () => {
+        if (!canSave) return;
         setLoading(true);
         await saveToGallery(imageUri);
         setLoading(false);
         onCancel();
-    }
+    }, [canSave, imageUri, onCancel]);
 
-    function handleNoContentCancel() {
+    const handleNoContentCancel = React.useCallback(() => {
         setShowNoContentModal(false);
         onCancel();
-    }
+    }, [onCancel]);
 
     return (
         <>
-            <LoadingCaptureModal visible={loading} />
-            <NoContentToDisplayModal visible={showNoContentModal} onCancel={handleNoContentCancel} />
+            {loading && <LoadingCaptureModal visible={loading} />}
+            {showNoContentModal && <NoContentToDisplayModal visible={showNoContentModal} onCancel={handleNoContentCancel} />}
             <Modal visible={visible} transparent>
                 <View style={styles.overlay}>
                     <Image source={{ uri: imageUri }} style={{ width: imageWidth, height: imageWidth / 1.25, borderRadius: 12 }} />
@@ -86,9 +87,9 @@ export function ImageDecisionModal({
                             <Text style={styles.buttonText}>Buscar conteúdo associado</Text>
                         </Pressable>
                         <Pressable
-                            style={[styles.fullButton, saveDisabled && { opacity: 0.5 }]}
+                            style={[styles.fullButton, !canSave ? { opacity: 0.5 } : {}]}
                             onPress={handleSave}
-                            disabled={saveDisabled}
+                            disabled={!canSave}
                         >
                             <MaterialIcons name="save" color={Colors.global.light} size={24} style={styles.icon} />
                             <Text style={styles.buttonText}>Salvar na galeria</Text>

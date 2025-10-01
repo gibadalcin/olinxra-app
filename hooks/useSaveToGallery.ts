@@ -1,21 +1,17 @@
 import * as MediaLibrary from 'expo-media-library';
+import { Alert } from 'react-native';
 
-export function useSaveToGallery() {
-    async function saveToGallery(imageUri: string, onSuccess?: () => void, onError?: () => void) {
-        const { status } = await MediaLibrary.requestPermissionsAsync(); // Removido argumento inválido
-        if (status !== 'granted') {
-            alert('Permissão para acessar a galeria negada.');
-            if (onError) onError();
-            return;
-        }
-        try {
-            await MediaLibrary.saveToLibraryAsync(imageUri);
-            alert('Imagem salva na galeria!');
-            if (onSuccess) onSuccess();
-        } catch (e) {
-            alert('Erro ao salvar imagem.');
-            if (onError) onError();
-        }
+export async function saveToGallery(imageUri: string): Promise<boolean> {
+  try {
+    await MediaLibrary.saveToLibraryAsync(imageUri);
+    Alert.alert('Sucesso', 'Imagem salva na galeria!');
+    return true;
+  } catch (e: any) {
+    if (e?.code === 'ERR_NO_PERMISSION') {
+      Alert.alert('Permissão negada', 'Não foi possível acessar a galeria.');
+    } else {
+      Alert.alert('Erro', 'Não foi possível salvar a imagem.');
     }
-    return { saveToGallery };
+    return false;
+  }
 }

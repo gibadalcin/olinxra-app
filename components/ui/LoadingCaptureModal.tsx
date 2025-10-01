@@ -12,28 +12,33 @@ interface LoadingCaptureModalProps {
 
 export function LoadingCaptureModal({ visible, onFinish, onCancel, result, minDuration = 3000 }: LoadingCaptureModalProps) {
     const [show, setShow] = useState(false);
+    const handleFinish = React.useCallback(() => {
+        if (onFinish) onFinish();
+    }, [onFinish]);
 
     useEffect(() => {
-        let timer: number;
+        let timer: number | undefined;
         if (visible) {
             setShow(true);
-            timer = setTimeout(() => {
-                if (onFinish) onFinish();
-            }, minDuration);
+            timer = setTimeout(handleFinish, minDuration);
         } else {
             setShow(false);
         }
         return () => {
             if (timer) clearTimeout(timer);
         };
-    }, [visible, minDuration, onFinish]);
+    }, [visible, minDuration, handleFinish]);
+
+    if (!visible && !show) return null;
 
     if (result?.status === 'error') {
         return (
-            <View>
-                <Text>Ocorreu um erro ao processar a imagem.</Text>
-                <Button title="Cancelar" onPress={onCancel} />
-            </View>
+            <Modal visible transparent animationType="fade">
+                <View style={styles.overlay}>
+                    <Text style={{ color: Colors.global.dark, marginBottom: 16 }}>Ocorreu um erro ao processar a imagem.</Text>
+                    <Button title="Cancelar" onPress={onCancel} color={Colors.global.blueDark} />
+                </View>
+            </Modal>
         );
     }
 
