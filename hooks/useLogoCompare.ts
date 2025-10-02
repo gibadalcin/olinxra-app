@@ -35,13 +35,19 @@ async function searchLogoInBackend(imageUri: string): Promise<any | null> {
             body: formData,
         });
         console.log("[compareLogo] Status da resposta:", response.status);
-        console.log("[compareLogo] Texto da resposta:", await response.text());
+        let responseText = await response.text();
+        console.log("[compareLogo] Texto da resposta:", responseText);
 
         if (response.ok) {
-            return await response.json();
+            try {
+                return JSON.parse(responseText);
+            } catch (e) {
+                console.error("Erro ao parsear JSON da resposta:", e);
+                return null;
+            }
         }
 
-        console.error("Erro do backend:", await response.text());
+        console.error("Erro do backend:", responseText);
         return null;
     } catch (error) {
         console.error("Erro na comunicação com o backend:", error);
