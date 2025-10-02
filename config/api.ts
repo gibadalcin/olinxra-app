@@ -1,21 +1,12 @@
-import Constants from 'expo-constants';
-
 function getBackendUrl(): string {
-  // Prioriza variável de ambiente do Expo
-  if (process.env.EXPO_PUBLIC_BACKEND_URL) {
-    return process.env.EXPO_PUBLIC_BACKEND_URL;
+  // Sempre prioriza variável de ambiente do Expo ou React Native
+  const expoUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
+  if (expoUrl) {
+    console.log('[API_CONFIG] Usando backend:', expoUrl);
+    return expoUrl;
   }
-
-  // Em desenvolvimento, detecta automaticamente o IP do Metro
-  if (__DEV__) {
-    const debuggerHost = Constants.expoConfig?.hostUri?.split(':')[0];
-    if (debuggerHost && debuggerHost !== 'localhost' && debuggerHost !== '127.0.0.1') {
-      return `http://${debuggerHost}:8000`;
-    }
-    return 'http://localhost:8000';
-  }
-
-  // Em produção, usar URL fixa
+  // Se não definido, alerta e retorna URL padrão de produção
+  console.warn('[API_CONFIG] Nenhuma variável de ambiente encontrada, usando URL padrão.');
   return 'https://seu-backend-producao.com';
 }
 

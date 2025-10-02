@@ -41,9 +41,13 @@ export function ImageDecisionModal({
                     typeof result.data.confidence === 'number'
                         ? `\nSimilaridade: ${result.data.confidence.toFixed(2)}`
                         : '';
+                const distance =
+                    typeof result.data.distance === 'number'
+                        ? `\nDistância: ${result.data.distance.toFixed(4)}`
+                        : '';
                 Alert.alert(
                     'Conteúdo reconhecido!',
-                    `Nome: ${result.data.name}${confidence}`
+                    `Nome: ${result.data.name}${confidence}${distance}`
                 );
             } else if (result.status === 'not_found') {
                 setShowNoContentModal(true);

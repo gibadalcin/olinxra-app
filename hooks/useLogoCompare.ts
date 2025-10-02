@@ -10,8 +10,18 @@ import { v4 as uuidv4 } from 'uuid';
  */
 async function searchLogoInBackend(imageUri: string): Promise<any | null> {
     try {
-        const backendUrl = API_CONFIG.BASE_URL;
-        if (!backendUrl) throw new Error("Backend URL não configurada");
+        // Usa a variável do backend online definida no .env e configurada em API_CONFIG
+            // Prioriza variável de ambiente do Expo, depois React Native
+            let backendUrl = '';
+            if (process.env.EXPO_PUBLIC_BACKEND_URL) {
+                backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
+            } else if (process.env.REACT_APP_API_URL) {
+                backendUrl = process.env.REACT_APP_API_URL;
+            } else {
+                backendUrl = API_CONFIG.BASE_URL;
+            }
+            if (!backendUrl) throw new Error("Backend URL não configurada");
+            console.log("[compareLogo] Enviando para backend:", backendUrl);
 
         const formData = new FormData();
         formData.append("file", {
@@ -24,6 +34,8 @@ async function searchLogoInBackend(imageUri: string): Promise<any | null> {
             method: "POST",
             body: formData,
         });
+        console.log("[compareLogo] Status da resposta:", response.status);
+        console.log("[compareLogo] Texto da resposta:", await response.text());
 
         if (response.ok) {
             return await response.json();
@@ -80,6 +92,11 @@ export async function compareLogo(imageUri: string) {
     if (backendResult && backendResult.found) {
         await saveLogoToCache(fileBuffer, backendResult);
         return { status: 'recognized', data: backendResult };
+    }
+
+    // Se backendResult for null, é erro de sistema
+    if (backendResult === null) {
+        return { status: 'error', error: 'Erro na comunicação com o backend.' };
     }
 
     return { status: 'not_found' };
