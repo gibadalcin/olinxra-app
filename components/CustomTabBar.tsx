@@ -1,14 +1,15 @@
 import React from "react";
+import type { NavigationState } from '@react-navigation/native';
 import { TouchableOpacity } from "react-native";
 import { useRouter, useSegments } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { ThemedView } from "./ThemedView";
 import { ThemedText } from "./ThemedText";
 
 const icons = [
     { name: "home", label: "Home", route: "/(tabs)/", family: Ionicons },
     { name: "camera", label: "Capturar", route: "/(tabs)/recognizer", family: Ionicons },
-    { name: "compass", label: "Explorar", route: "/(tabs)/explorer", family: Ionicons },
+    { name: "magnify-expand", label: "Explorar", route: "/(tabs)/explorer", family: MaterialCommunityIcons },
     { name: "help-circle", label: "Ajuda", route: "/(tabs)/help", family: Ionicons },
     { name: "settings", label: "Opções", route: "/(tabs)/options", family: Ionicons },
 ];
@@ -17,7 +18,7 @@ const activeColor = "#012E57";
 const inactiveColor = "#012E57";
 const inactiveOpacity = 0.6;
 
-export default function CustomTabBar({ state }) {
+export default function CustomTabBar({ state }: { state: NavigationState }) {
     const router = useRouter();
     const segments = useSegments();
     const activeRoute = segments[segments.length - 1] || "index";
@@ -49,7 +50,7 @@ export default function CustomTabBar({ state }) {
                         style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
                     >
                         <icon.family
-                            name={icon.name}
+                            name={icon.name as any}
                             size={28}
                             color={isActive ? activeColor : inactiveColor}
                             style={{ opacity: isActive ? 1 : inactiveOpacity }}
