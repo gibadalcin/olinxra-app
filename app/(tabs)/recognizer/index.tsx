@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: Colors["light"]?.highlight || "#FFD700",
+        backgroundColor: Colors["global"]?.highlight || "#FFD700",
     },
     camera: {
         width: width * 0.9,

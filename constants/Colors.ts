@@ -34,7 +34,6 @@ export const Colors = {
     splashBackground: secondaryColorDark,
     splashProgress: colorLight_01,
     splashProgressBg: secondaryColorLight,
-    highlight: highlightColor,
     textLink: colorTitleDark,
     headerText: primaryColorDark,
     headerBg: colorLight_01,
@@ -61,6 +60,7 @@ export const Colors = {
     error: '#ff3b30',
     warning: '#ffcc00',
     success: '#4cd964',
+    highlight: highlightColor,
     info: secondaryColorDark,
     marker: secondaryColorLight,
     dark: colorDark_01,
@@ -69,6 +69,7 @@ export const Colors = {
     blueDark: colorDark_10,
     blueSoft: colorTitleDark,
     light: secondaryColorLight,
-    red: colorDark_20
+    red: colorDark_20,
+    soft: primaryColorLight
   },
 };

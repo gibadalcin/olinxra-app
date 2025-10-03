@@ -65,7 +65,7 @@ export default function TabLayout() {
                         name="recognizer"
                         options={{
                             ...getHeaderOptions(
-                                "Capturar Logomarcas",
+                                "Capturar Logomarca",
                                 undefined,
                                 Colors["light"].headerText,
                                 Colors["light"].headerBg
@@ -82,7 +82,7 @@ export default function TabLayout() {
                                 />
                             ),
                             headerStyle: {
-                                borderBottomWidth: 2,
+                                borderBottomWidth: 1,
                                 borderBottomColor: Colors["global"].blueSoft,
                                 backgroundColor: Colors["light"].headerBg,
                             },
@@ -108,7 +108,7 @@ export default function TabLayout() {
                         name="options"
                         options={{
                             ...getHeaderOptions(
-                                "Opções",
+                                "Configurações globais",
                                 undefined,
                                 Colors["light"].headerText,
                                 Colors["light"].headerBg
@@ -118,6 +118,17 @@ export default function TabLayout() {
                                     <Ionicons name="settings-outline" size={ICON_SIZE} color={color} />
                                 </ThemedView>
                             ),
+                            headerLeft: () => (
+                                <Image
+                                    source={require('../../assets/images/adaptive-icon.png')}
+                                    style={{ width: 32, height: 32, marginLeft: 16, marginRight: 8 }}
+                                />
+                            ),
+                            headerStyle: {
+                                borderBottomWidth: 1,
+                                borderBottomColor: Colors["global"].blueSoft,
+                                backgroundColor: Colors["light"].headerBg,
+                            },
                         }}
                     />
                 </Tabs>
