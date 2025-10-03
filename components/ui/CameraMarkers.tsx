@@ -1,35 +1,62 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
 
-const MARKER_SIZE = 30;
-const MARKER_BORDER = 4;
-const MARKER_RADIUS = MARKER_BORDER;
+const MARKER_LENGTH = 80;
+const MARKER_BORDER = 1;
+const MARKER_RADIUS = 2;
 const MARKER_COLOR = Colors.global.marker;
-const CONTAINER_WIDTH = 250;
-const CONTAINER_HEIGHT = 200;
+const CONTAINER_WIDTH = 300;
+const CONTAINER_HEIGHT = 250;
 
 const styles = StyleSheet.create({
     markerContainer: {
         position: 'absolute',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         alignItems: 'center',
+        pointerEvents: 'none',
     },
     marker: {
         position: 'absolute',
-        width: MARKER_SIZE,
-        height: MARKER_SIZE,
+        width: MARKER_LENGTH,
+        height: MARKER_LENGTH,
+        borderColor: MARKER_COLOR,
         borderRadius: MARKER_RADIUS,
+    },
+    topLeft: {
+        left: 0,
+        top: 0,
+        borderLeftWidth: MARKER_BORDER,
+        borderTopWidth: MARKER_BORDER,
+    },
+    topRight: {
+        right: 0,
+        top: 0,
+        borderRightWidth: MARKER_BORDER,
+        borderTopWidth: MARKER_BORDER,
+
+    },
+    bottomLeft: {
+        left: 0,
+        bottom: 0,
+        borderLeftWidth: MARKER_BORDER,
+        borderBottomWidth: MARKER_BORDER,
+    },
+    bottomRight: {
+        right: 0,
+        bottom: 0,
+        borderRightWidth: MARKER_BORDER,
+        borderBottomWidth: MARKER_BORDER,
     },
     zoomHintContainer: {
         position: 'absolute',
-        bottom: 2,
-        left: 6,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 16,
+        right: 0,
+        bottom: 0,
+        alignItems: 'flex-end',
+        justifyContent: 'flex-end',
         flexDirection: 'row',
+        padding: 4,
     },
     zoomHintText: {
         fontSize: 13,
@@ -40,40 +67,15 @@ const styles = StyleSheet.create({
 });
 
 const markerStyles = [
-    // Top Left
-    {
-        left: 0,
-        top: 0,
-        borderTopWidth: MARKER_BORDER,
-        borderLeftWidth: MARKER_BORDER,
-    },
-    // Top Right
-    {
-        right: 0,
-        top: 0,
-        borderTopWidth: MARKER_BORDER,
-        borderRightWidth: MARKER_BORDER,
-    },
-    // Bottom Left
-    {
-        left: 0,
-        bottom: 0,
-        borderBottomWidth: MARKER_BORDER,
-        borderLeftWidth: MARKER_BORDER,
-    },
-    // Bottom Right
-    {
-        right: 0,
-        bottom: 0,
-        borderBottomWidth: MARKER_BORDER,
-        borderRightWidth: MARKER_BORDER,
-    },
+    styles.topLeft,
+    styles.topRight,
+    styles.bottomLeft,
+    styles.bottomRight,
 ];
 
 export function CameraMarkers() {
     return (
         <View
-            pointerEvents="none"
             style={[
                 styles.markerContainer,
                 {
@@ -86,20 +88,15 @@ export function CameraMarkers() {
                 },
             ]}
         >
+            {/* Cantos estilo Google Lens */}
             {markerStyles.map((style, idx) => (
                 <View
                     key={idx}
-                    style={[
-                        styles.marker,
-                        style,
-                        {
-                            borderColor: MARKER_COLOR,
-                        },
-                    ]}
+                    style={[styles.marker, style]}
                 />
             ))}
             <View style={styles.zoomHintContainer} pointerEvents="none">
-                <Ionicons name="resize" size={28} color={MARKER_COLOR} style={{ marginBottom: 4 }} />
+                <MaterialCommunityIcons name="resize-bottom-right" size={60} color={MARKER_COLOR} style={{ marginBottom: 4, right: 4 }} />
             </View>
         </View>
     );

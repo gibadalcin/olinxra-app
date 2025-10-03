@@ -4,36 +4,35 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { ThemedText } from '@/components/ThemedText';
 import { Colors } from '@/constants/Colors';
 
-const ICON_SIZE = 32;
-const OUTER_CIRCLE_SIZE = 62;
-const INNER_CIRCLE_SIZE = 60;
+const ICON_SIZE = 40;
+const OUTER_CIRCLE_SIZE = 72;
+const INNER_CIRCLE_SIZE = 70;
 const PART_CIRCLE_SIZE = 2;
 
 type CameraActionsProps = {
     onOpenGallery: () => void;
     onTakePicture: () => void;
-    onOpenHistory: () => void;
 };
 
 export function CameraActions({
     onOpenGallery,
     onTakePicture,
-    onOpenHistory,
 }: CameraActionsProps) {
     const { width } = useWindowDimensions();
     return (
-        <View style={[styles.buttonRow, { width: width * 0.9 }]}>
+        <View style={[styles.absoluteContainer, { width: width * 0.9, alignSelf: 'center' }]}>
             <Pressable
                 onPress={onOpenGallery}
                 accessibilityLabel="Abrir galeria"
                 accessibilityRole="button"
+                style={styles.galleryButton}
             >
-                <Ionicons name="images" size={ICON_SIZE} color={Colors.light.tabIconDefault} />
+                <Ionicons name="images" size={ICON_SIZE} color={Colors.light.background + '99'} />
                 <ThemedText style={styles.label}>Galeria</ThemedText>
             </Pressable>
             <Pressable
                 style={({ pressed }) => [
-                    styles.mainButton,
+                    styles.captureButton,
                     { opacity: pressed ? 0.7 : 1 },
                 ]}
                 onPress={onTakePicture}
@@ -46,25 +45,36 @@ export function CameraActions({
                     </View>
                 </View>
             </Pressable>
-            <Pressable
-                onPress={onOpenHistory}
-                accessibilityLabel="Abrir salvos"
-                accessibilityRole="button"
-            >
-                <Ionicons name="folder-open" size={ICON_SIZE} color={Colors.light.tabIconDefault} />
-                <ThemedText style={styles.label}>Salvos</ThemedText>
-            </Pressable>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    buttonRow: {
-        flexDirection: "row",
-        alignItems: "flex-end",
-        marginTop: 24,
-        justifyContent: "space-around",
-        position: "relative",
+    absoluteContainer: {
+        position: 'relative',
+        height: OUTER_CIRCLE_SIZE + 40,
+        marginBottom: '6%',
+    },
+    galleryButton: {
+        position: 'absolute',
+        left: '10%',
+        bottom: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    captureButton: {
+        position: 'absolute',
+        left: '50%',
+        top: 0,
+        transform: [{ translateX: -OUTER_CIRCLE_SIZE / 2 }],
+        marginBottom: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2,
+    },
+    sideButton: {
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     mainButton: {
         marginBottom: 20,
@@ -73,7 +83,7 @@ const styles = StyleSheet.create({
         width: OUTER_CIRCLE_SIZE,
         height: OUTER_CIRCLE_SIZE,
         borderRadius: OUTER_CIRCLE_SIZE / PART_CIRCLE_SIZE,
-        backgroundColor: Colors.dark.tint,
+        backgroundColor: 'rgba(0,0,0,0.35)', // semitransparente
         justifyContent: 'center',
         alignItems: 'center',
         shadowColor: Colors.global.dark,
@@ -86,8 +96,8 @@ const styles = StyleSheet.create({
         width: INNER_CIRCLE_SIZE,
         height: INNER_CIRCLE_SIZE,
         borderRadius: INNER_CIRCLE_SIZE / PART_CIRCLE_SIZE,
-        backgroundColor: Colors.dark.tint,
-        borderColor: Colors.light.background,
+        backgroundColor: Colors.dark.tint + '99',
+        borderColor: Colors.light.background + 'cc',
         borderWidth: 3,
         justifyContent: 'center',
         alignItems: 'center',
@@ -96,5 +106,6 @@ const styles = StyleSheet.create({
         fontSize: 12,
         textAlign: 'center',
         fontWeight: '700',
+        color: Colors.light.background + 'cc',
     },
 });

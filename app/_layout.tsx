@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { CaptureSettingsProvider } from '@/context/CaptureSettingsContext';
 import { useHideNavigationBar } from "@/hooks/useNavigationBar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
@@ -8,12 +9,14 @@ export default function Layout() {
 
     // Wrapper de gestos para acessibilidade e navegação
     return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
-            <Stack
-                screenOptions={{
-                    headerShown: false,
-                }}
-            />
-        </GestureHandlerRootView>
+        <CaptureSettingsProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+                <Stack
+                    screenOptions={{
+                        headerShown: false,
+                    }}
+                />
+            </GestureHandlerRootView>
+        </CaptureSettingsProvider>
     );
 }

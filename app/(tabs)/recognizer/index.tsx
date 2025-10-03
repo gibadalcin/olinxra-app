@@ -1,5 +1,7 @@
+import { Image } from 'react-native';
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, Dimensions, ActivityIndicator, Alert } from "react-native";
+import { useCaptureSettings } from '@/context/CaptureSettingsContext';
+import { View, Text, StyleSheet, ActivityIndicator, Alert, Dimensions } from "react-native";
 import { CameraView, Camera } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import PermissionRequest from "@/components/ui/PermissionRequest";
@@ -10,8 +12,9 @@ import { ImageDecisionModal } from "@/components/ui/ImageDecisionModal";
 import { CameraActions } from '@/components/ui/CameraActions';
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { BlurView } from "expo-blur";
+import { Ionicons } from '@expo/vector-icons';
 
-const { width, height } = Dimensions.get("window");
 const AnimatedCameraView = Animated.createAnimatedComponent(CameraView);
 const MAX_ZOOM = 0.8;
 const MIN_ZOOM = 0;
@@ -19,9 +22,12 @@ const MIN_ZOOM = 0;
 const ZOOM_SENSITIVITY = 0.05;
 const ZOOM_MULTIPLIER = 10;
 
+const headerTitle = "Capturar Logomarca";
+
 type ImageSourceType = 'camera' | 'gallery' | null;
 
 export default function RecognizerHome() {
+    const { showOrientation } = useCaptureSettings();
     // Tipagem correta para useRef (não é preciso usar 'any' para a CameraView)
     const cameraRef = useRef<CameraView>(null);
     const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -102,10 +108,6 @@ export default function RecognizerHome() {
         }
     }, [cameraRef, isProcessing, handlePermissions]);
 
-    const openHistory = useCallback(() => {
-        // lógica para abrir histórico/salvos
-    }, []);
-
     // Renderização
     if (hasPermission === null) {
         return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={Colors["light"]?.background || "#fff"} /></View>;
@@ -116,59 +118,111 @@ export default function RecognizerHome() {
 
     return (
         <View style={styles.container}>
+            {/* Header customizado fixo no topo */}
+            <View style={styles.customHeader}>
+                <Image
+                    source={require('@/assets/images/adaptive-icon-w.png')}
+                    style={styles.headerIcon}
+                />
+                <Text style={styles.headerText}>{headerTitle}</Text>
+            </View>
             <GestureDetector gesture={pinchGesture}>
-                <View style={styles.camera}>
+                <View style={{ flex: 1 }}>
                     <AnimatedCameraView
                         ref={cameraRef}
-                        style={{ width: "100%", height: "100%" }}
+                        style={styles.camera}
                         facing="back"
                         zoom={zoomLevel}
                     />
                     <CameraMarkers />
                 </View>
             </GestureDetector>
-
-            <Text style={styles.description}>
-                Aponte a câmera para a logomarca e toque para capturar.
-            </Text>
-            <View>
+            {/* Orientação sobreposta no topo com glass */}
+            {showOrientation && (
+                <BlurView intensity={20} tint="dark" style={styles.glassTop}>
+                    <Text style={styles.glassText}>
+                        Aponte a câmera para a logomarca e toque em {' '}
+                        <Ionicons name="camera-outline" size={20} color={Colors["light"]?.background || "#ffffff"} />
+                        {'  '}para capturar ou em {' '}
+                        <Ionicons name="image-outline" size={20} color={Colors["light"]?.background || "#ffffff"} />
+                        {'  '}para abrir a galeria.
+                    </Text>
+                </BlurView>
+            )}
+            {/* Botões e modais sobrepostos à câmera */}
+            <View style={styles.overlayContainer} pointerEvents="box-none">
                 {isProcessing && <ActivityIndicator size="large" color={Colors["light"]?.background || "#fff"} style={styles.activityIndicator} />}
                 <CameraActions
                     onOpenGallery={openGallery}
                     onTakePicture={handleCapture}
-                    onOpenHistory={openHistory}
+                />
+                <ImageDecisionModal
+                    visible={modalVisible}
+                    imageUri={capturedImage}
+                    onCancel={() => {
+                        setModalVisible(false);
+                        setCapturedImage("");
+                        setImageSource(null);
+                    }}
+                    saveDisabled={isProcessing}
+                    imageSource={imageSource}
                 />
             </View>
-            <ImageDecisionModal
-                visible={modalVisible}
-                imageUri={capturedImage}
-                onCancel={() => {
-                    setModalVisible(false);
-                    setCapturedImage("");
-                    setImageSource(null);
-                }}
-                saveDisabled={isProcessing}
-                imageSource={imageSource}
-            />
         </View>
     );
 }
 
 const styles = StyleSheet.create({
+    customHeader: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '12%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: '12%',
+        paddingBottom: 8,
+        paddingHorizontal: 16,
+        zIndex: 100,
+        backgroundColor: 'transparent', // glass effect
+        borderBottomLeftRadius: 18,
+        borderBottomRightRadius: 18,
+        overflow: 'hidden',
+        gap: 8,
+    },
+    headerIcon: {
+        width: 32,
+        height: 32,
+        marginRight: 8,
+        resizeMode: 'contain',
+    },
+    headerText: {
+        fontSize: 20,
+        height: 32,
+        fontWeight: 'bold',
+        color: Colors["light"]?.background || '#FFFFFF',
+        textAlign: 'center',
+        flex: 0,
+        textShadowColor: 'rgba(0,0,0,0.12)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
+    },
     container: {
         flex: 1,
-        alignItems: "center",
-        backgroundColor: Colors["light"]?.background || "#012E57",
-        paddingTop: 32,
+        backgroundColor: 'transparent',
     },
-    contentButtons: {
-        flexDirection: "row",
+    overlayContainer: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: "flex-end",
         alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: Colors["light"]?.tint || "#012E57",
-        width: "100%",
-        position: "relative",
-        height: 100,
+        pointerEvents: "box-none",
+        paddingBottom: 16,
     },
     loadingContainer: {
         flex: 1,
@@ -177,80 +231,40 @@ const styles = StyleSheet.create({
         backgroundColor: Colors["global"]?.highlight || "#FFD700",
     },
     camera: {
-        width: width * 0.9,
-        height: height * 0.5,
-        borderRadius: 8,
-        overflow: "hidden",
+        flex: 1,
+        width: "100%",
+        height: "100%",
     },
     description: {
-        marginTop: 24,
-        color: Colors["light"]?.text || "#151515ff",
+        display: 'none',
+    },
+    glassTop: {
+        position: 'absolute',
+        top: '14%',
+        left: '50%',
+        width: '90%',
+        transform: [{ translateX: -0.45 * Dimensions.get('window').width }],
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.18)', // mais transparente
+        zIndex: 10,
+        borderTopRightRadius: 8,
+        borderBottomRightRadius: 8,
+        borderColor: Colors.dark.tint + '99' || "#ffffff",
+        borderLeftWidth: 5,
+        overflow: 'hidden',
+        flexDirection: 'row',
+    },
+    glassText: {
+        color: Colors["light"]?.background || "#ffffff",
         fontSize: 18,
-        textAlign: "center",
-        width: width * 0.9,
-    },
-    captureCircle: {
-        width: 84,
-        height: 84,
-        borderRadius: 55,
-        backgroundColor: Colors["global"]?.blueDark || "#012E57",
-        alignItems: "center",
-        justifyContent: "center",
-        marginHorizontal: 20,
-        shadowColor: Colors["global"]?.dark || "#000000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 4,
-        flexDirection: "row",
-    },
-    captureButton: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: "transparent",
-        borderWidth: 4,
-        borderColor: Colors["light"]?.background || "#ffffff",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    flashButton: {
-        position: "absolute",
-        right: 20,
-        bottom: 4,
-        width: 54,
-        height: 44,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "transparent",
-        borderRadius: 0,
-        borderWidth: 0,
-        elevation: 0,
-    },
-    flashLabel: {
-        fontSize: 12,
-        color: Colors["light"]?.tabIconDefault || "#fff",
-        marginTop: 2,
-        textAlign: "center"
-    },
-    galleryButton: {
-        position: "absolute",
-        left: 20,
-        bottom: 4,
-        width: 44,
-        height: 44,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "transparent",
-        borderRadius: 0,
-        borderWidth: 0,
-        elevation: 0,
-    },
-    galleryLabel: {
-        fontSize: 12,
-        color: Colors["light"]?.tabIconDefault || "#fff",
-        marginTop: 2,
-        textAlign: "center"
+        fontWeight: 'bold',
+        textShadowColor: 'rgba(0,0,0,0.12)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
+        lineHeight: 25
     },
     activityIndicator: {
         position: 'absolute',
