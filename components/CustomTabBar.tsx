@@ -5,6 +5,7 @@ import { useRouter, useSegments } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { ThemedView } from "./ThemedView";
 import { ThemedText } from "./ThemedText";
+import { Colors } from "@/constants/Colors";
 
 const icons = [
     { name: "home", label: "Home", route: "/(tabs)/", family: Ionicons },
@@ -14,8 +15,8 @@ const icons = [
     { name: "settings", label: "Opções", route: "/(tabs)/options", family: Ionicons },
 ];
 
-const activeColor = "#012E57";
-const inactiveColor = "#012E57";
+const activeColor = Colors.global.blueDark;
+const inactiveColor = activeColor;
 const inactiveOpacity = 0.6;
 
 export default function CustomTabBar({ state }: { state: NavigationState }) {
@@ -34,9 +35,9 @@ export default function CustomTabBar({ state }: { state: NavigationState }) {
                 justifyContent: "space-around",
                 alignItems: "center",
                 height: 64,
-                backgroundColor: "#FCFCFC",
-                borderTopWidth: 1,
-                borderTopColor: "#B3CDE0",
+                backgroundColor: Colors.light.tabBarBg,
+                borderTopWidth: .3,
+                borderTopColor: Colors.global.soft,
             }}
         >
             {icons.map((icon) => {

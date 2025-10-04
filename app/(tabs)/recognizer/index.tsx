@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
         zIndex: 10,
         borderTopRightRadius: 8,
         borderBottomRightRadius: 8,
-        borderColor: Colors.dark.tint + '99' || "#ffffff",
+        borderColor: Colors.global.bg + '99' || "#ffffff",
         borderLeftWidth: 5,
         overflow: 'hidden',
         flexDirection: 'row',

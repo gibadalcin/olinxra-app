@@ -3,7 +3,6 @@ import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { useCaptureSettings } from '@/context/CaptureSettingsContext';
 import { Switch, View, Image, Text, StyleSheet } from 'react-native';
-import { BlurView } from 'expo-blur';
 
 const headerTitle = "Configurações globais";
 
@@ -40,8 +39,8 @@ export default function Options() {
                         <Switch
                             value={showOrientation}
                             onValueChange={setShowOrientation}
-                            trackColor={{ false: Colors.global.blueDark + '33', true: Colors.global.blueDark + '66' }}
-                            thumbColor={showOrientation ? Colors.global.blueDark : Colors.light.background}
+                            trackColor={{ false: Colors.global.blueDark + '33', true: Colors.global.bg + '66' }}
+                            thumbColor={showOrientation ? Colors.global.bg : Colors.light.background}
                         />
                     </ThemedView>
                 </ThemedView>

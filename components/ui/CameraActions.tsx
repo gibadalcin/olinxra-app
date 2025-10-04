@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
         width: INNER_CIRCLE_SIZE,
         height: INNER_CIRCLE_SIZE,
         borderRadius: INNER_CIRCLE_SIZE / PART_CIRCLE_SIZE,
-        backgroundColor: Colors.dark.tint + '99',
+        backgroundColor: Colors.global.bg + '99',
         borderColor: Colors.light.background + 'cc',
         borderWidth: 3,
         justifyContent: 'center',
