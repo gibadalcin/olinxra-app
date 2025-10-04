@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Button, StyleSheet, type ImageSourcePropType } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { Image } from 'expo-image';
-import { Colors } from '../../constants/Colors';
+import { Colors } from '@/constants/Colors';
 
 type PermissionRequestProps = {
     onRequestPermission: () => void;
@@ -40,7 +40,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         flex: 1,
-        backgroundColor: '#012E57',
+        backgroundColor: Colors.global.light,
     },
     logo: {
         width: 200,

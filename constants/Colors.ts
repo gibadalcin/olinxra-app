@@ -70,6 +70,7 @@ export const Colors = {
     blueSoft: colorTitleDark,
     light: secondaryColorLight,
     red: colorDark_20,
-    soft: primaryColorLight
+    soft: primaryColorLight,
+    bg: secondaryColorDark
   },
 };

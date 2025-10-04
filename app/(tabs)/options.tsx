@@ -3,6 +3,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { useCaptureSettings } from '@/context/CaptureSettingsContext';
 import { Switch, View, Image, Text, StyleSheet } from 'react-native';
+import { BlurView } from 'expo-blur';
 
 const headerTitle = "Configurações globais";
 
@@ -11,41 +12,48 @@ export default function Options() {
     const { showOrientation, setShowOrientation } = useCaptureSettings();
 
     return (
-        <ThemedView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+        <ThemedView style={{ flex: 1 }}>
             {/* Header customizado fixo no topo */}
             <View style={styles.customHeader}>
-                <Image
-                    source={require('@/assets/images/adaptive-icon-w.png')}
-                    style={styles.headerIcon}
-                />
-                <Text style={styles.headerText}>{headerTitle}</Text>
+                <View style={styles.customHeaderContent}>
+                    <Image
+                        source={require('@/assets/images/adaptive-icon-w.png')}
+                        style={styles.headerIcon}
+                    />
+                    <View>
+                        <Text style={styles.headerText}>{headerTitle}</Text>
+                    </View>
+                </View>
             </View>
 
-            {/* Bloco de funções de sistema */}
-            <ThemedView style={styles.functionsBlock}>
-                <ThemedText style={styles.functionsTitle}>
-                    Funções da tela de captura
-                </ThemedText>
-                <ThemedView style={styles.switchRow}>
-                    <ThemedText style={styles.switchLabel}>
-                        Mostrar orientação de captura
-                    </ThemedText>
-                    <Switch
-                        value={showOrientation}
-                        onValueChange={setShowOrientation}
-                        trackColor={{ false: Colors.global.blueDark + '33', true: Colors.global.blueDark + '66' }}
-                        thumbColor={showOrientation ? Colors.global.blueDark : Colors.light.background}
-                    />
-                </ThemedView>
-            </ThemedView>
 
-            <ThemedView style={styles.footer}>
-                <ThemedText style={styles.footerText}>
-                    © {new Date().getFullYear()} Olinx Digital
-                </ThemedText>
-                <ThemedText style={styles.footerVersion}>
-                    Versão {require('../../package.json').version}
-                </ThemedText>
+            <ThemedView style={styles.container}>
+                {/* Bloco de funções de sistema */}
+                <ThemedView style={styles.functionsBlock}>
+                    <ThemedText style={styles.functionsTitle}>
+                        Funções da tela de captura
+                    </ThemedText>
+                    <ThemedView style={styles.switchRow}>
+                        <ThemedText style={styles.switchLabel}>
+                            Mostrar orientação de captura
+                        </ThemedText>
+                        <Switch
+                            value={showOrientation}
+                            onValueChange={setShowOrientation}
+                            trackColor={{ false: Colors.global.blueDark + '33', true: Colors.global.blueDark + '66' }}
+                            thumbColor={showOrientation ? Colors.global.blueDark : Colors.light.background}
+                        />
+                    </ThemedView>
+                </ThemedView>
+
+                <ThemedView style={styles.footer}>
+                    <ThemedText style={styles.footerText}>
+                        © {new Date().getFullYear()} Olinx Digital
+                    </ThemedText>
+                    <ThemedText style={styles.footerVersion}>
+                        Versão {require('../../package.json').version}
+                    </ThemedText>
+                </ThemedView>
             </ThemedView>
         </ThemedView>
     );
@@ -53,26 +61,27 @@ export default function Options() {
 
 const styles = StyleSheet.create({
     customHeader: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: '12%',
+        height: 100,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.global.bg + 'ee',
+        paddingTop: 30,
+        paddingBottom: 0,
+        overflow: 'hidden',
+        gap: 8,
+    },
+    customHeaderContent: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingTop: '12%',
-        paddingBottom: 8,
-        paddingHorizontal: 16,
-        zIndex: 100,
-        backgroundColor: Colors.global.blueDark + '66', // glass effect
-        overflow: 'hidden',
-        gap: 8,
+        alignSelf: 'center',
+        width: '100%',
+        paddingBottom: 12,
     },
     headerIcon: {
         width: 32,
         height: 32,
-        marginRight: 8,
+        marginRight: 12,
         resizeMode: 'contain',
     },
     headerText: {
@@ -86,8 +95,16 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 2,
     },
+    container: {
+        width: '100%',
+        height: '80%',
+        bottom: 0,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        marginTop: -14, // Adiciona sobreposição de 14px sobre o header
+    },
     functionsBlock: {
-        top: '16%',
+        top: 24,
         padding: 16,
         borderWidth: 0.5,
         borderColor: Colors.global.blueDark + '99',
@@ -120,14 +137,15 @@ const styles = StyleSheet.create({
         right: 0,
         alignItems: "center",
         backgroundColor: 'transparent',
+        zIndex: 10, // Adicionado para ficar acima do overlay
     },
     footerText: {
-        color: Colors.global.blueDark,
+        color: Colors.global.light,
         fontSize: 14,
         marginBottom: 4,
     },
     footerVersion: {
-        color: Colors.global.blueDark,
+        color: Colors.global.light,
         fontSize: 12,
     },
 });
