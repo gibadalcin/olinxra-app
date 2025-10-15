@@ -59,6 +59,7 @@ async function searchLogoInBackend(imageUri: string): Promise<any | null> {
  * Lida com a lógica completa de comparação de logo, incluindo cache e comunicação com o backend.
  */
 export async function compareLogo(imageUri: string) {
+    const SIMILARIDADE_MINIMA = 0.7;
     let finalUri: string = imageUri;
     
     // 1. Manuseio do URI (base64 vs. file://)
@@ -95,15 +96,31 @@ export async function compareLogo(imageUri: string) {
     ]);
 
     // 5. Tratamento da Resposta
-    if (backendResult && backendResult.found) {
-        await saveLogoToCache(fileBuffer, backendResult);
-        return { status: 'recognized', data: backendResult };
+    if (backendResult && backendResult.found && typeof backendResult.confidence === 'number') {
+        if (backendResult.confidence >= SIMILARIDADE_MINIMA) {
+            await saveLogoToCache(fileBuffer, backendResult);
+            const result = { status: 'recognized', data: backendResult };
+            console.log('[compareLogo] Resultado final:', result);
+            return result;
+        } else {
+            const result = {
+                status: 'low_similarity',
+                data: backendResult,
+                message: `Nenhum logo reconhecido com confiança suficiente. Similaridade: ${(backendResult.confidence).toFixed(2)}%`
+            };
+            console.log('[compareLogo] Resultado final:', result);
+            return result;
+        }
     }
 
     // Se backendResult for null, é erro de sistema
     if (backendResult === null) {
-        return { status: 'error', error: 'Erro na comunicação com o backend.' };
+        const result = { status: 'error', error: 'Erro na comunicação com o backend.' };
+        console.log('[compareLogo] Resultado final:', result);
+        return result;
     }
 
-    return { status: 'not_found' };
+    const result = { status: 'not_found' };
+    console.log('[compareLogo] Resultado final:', result);
+    return result;
 }

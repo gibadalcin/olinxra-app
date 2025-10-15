@@ -36,24 +36,29 @@ export function ImageDecisionModal({
         let shouldCancel = true;
         try {
             const result = await compareLogo(imageUri);
-            if ((result.status === 'cached' || result.status === 'recognized') && result.data?.name) {
+            if ((result.status === 'cached' || result.status === 'recognized') && 'data' in result && result.data && typeof result.data.name === 'string') {
                 const confidence =
-                    typeof result.data.confidence === 'number'
+                    'confidence' in result.data && typeof result.data.confidence === 'number'
                         ? `\nSimilaridade: ${result.data.confidence.toFixed(2)}`
                         : '';
                 const distance =
-                    typeof result.data.distance === 'number'
+                    'distance' in result.data && typeof result.data.distance === 'number'
                         ? `\nDistância: ${result.data.distance.toFixed(4)}`
                         : '';
                 Alert.alert(
                     'Conteúdo reconhecido!',
                     `Nome: ${result.data.name}${confidence}${distance}`
                 );
+            } else if (result.status === 'low_similarity') {
+                Alert.alert(
+                    'Reconhecimento não confiável',
+                    ('message' in result && typeof result.message === 'string') ? result.message : 'Nenhum logo reconhecido com confiança suficiente.'
+                );
             } else if (result.status === 'not_found') {
                 setShowNoContentModal(true);
                 shouldCancel = false;
             } else if (result.status === 'error') {
-                Alert.alert('Erro', result.error || 'Falha na comunicação com o servidor.');
+                Alert.alert('Erro', ('error' in result && typeof result.error === 'string') ? result.error : 'Falha na comunicação com o servidor.');
             } else {
                 Alert.alert('Erro', 'Resposta inesperada do servidor.');
             }
