@@ -54,7 +54,36 @@ export function ImageDecisionModal({
                         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
                         const lat = loc.coords.latitude;
                         const lon = loc.coords.longitude;
-                        const conteudo = await fetchContentForRecognition(result.data.name, lat, lon);
+                        const resp = await fetchContentForRecognition(result.data.name, lat, lon);
+                        // fetchContentForRecognition now returns the full backend response when available
+                        // normalize to `conteudo` (array or object) and extract location metadata
+                        let conteudo: any = null;
+                        let respLocalizacao: any = null;
+                        let respNomeRegiao: any = null;
+                        let respTipoRegiao: any = null;
+                        let respEndereco: any = null;
+                        if (resp) {
+                            if (Array.isArray(resp)) {
+                                conteudo = resp;
+                            } else if (resp.conteudo) {
+                                conteudo = resp.conteudo;
+                                respLocalizacao = resp.localizacao;
+                                respNomeRegiao = resp.nome_regiao || resp.nomeRegiao;
+                                respTipoRegiao = resp.tipo_regiao || resp.tipoRegiao;
+                                respEndereco = resp.endereco || null;
+                            } else if (resp.blocos) {
+                                conteudo = resp.blocos;
+                                respLocalizacao = resp.localizacao;
+                                respNomeRegiao = resp.nome_regiao || resp.nomeRegiao;
+                                respTipoRegiao = resp.tipo_regiao || resp.tipoRegiao;
+                                respEndereco = resp.endereco || null;
+                            } else {
+                                // fallback: resp may already be the conteudo
+                                conteudo = resp;
+                                respLocalizacao = resp.localizacao || resp.localizacao;
+                                respNomeRegiao = resp.nome_regiao || resp.nomeRegiao;
+                            }
+                        }
                         if (conteudo) {
                             // convert up to N images inside conteudo.blocos to data:URLs to guarantee availability in WebView
                             async function convertBlockImagesToDataUrls(conteudoObj: any, maxImages = 3, maxBytes = 2_500_000) {
@@ -171,7 +200,12 @@ export function ImageDecisionModal({
                                 }
                             } catch (e) { console.debug('[ImageDecisionModal] ensure totem brands failed', e); }
 
-                            const payload = { nome_marca: result.data.name, previewImage: preview, blocos: conteudo, anchorMode, anchorData };
+                            const payload: any = { nome_marca: result.data.name, previewImage: preview, blocos: conteudo, anchorMode, anchorData };
+                            // include backend-provided location metadata when available
+                            if (respLocalizacao) payload.localizacao = respLocalizacao;
+                            if (respNomeRegiao) payload.nome_regiao = respNomeRegiao;
+                            if (respTipoRegiao) payload.tipo_regiao = respTipoRegiao;
+                            if (respEndereco) payload.endereco = respEndereco;
                             // safe stringify (truncate long strings like base64)
                             try {
                                 const seen = new WeakSet();

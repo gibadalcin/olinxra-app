@@ -19,8 +19,8 @@ export function useARContent() {
       if (radius && Number.isFinite(radius)) body.radius_m = radius;
       const res = await fetch(`${base}/consulta-conteudo/`, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
-      const j = await res.json();
-      return j;
+  const j = await res.json();
+  return j; // return full response (contains conteudo + localizacao)
     } catch (e) {
       console.warn('consulta helper error', e);
       return null;
@@ -33,8 +33,8 @@ export function useARContent() {
       const url = `${base}/api/conteudo?nome_marca=${encodeURIComponent(nome_marca)}&latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&radius=${encodeURIComponent(radius)}`;
       const res = await fetch(url);
       if (!res.ok) return null;
-      const j = await res.json();
-      return j;
+  const j = await res.json();
+  return j; // full response with conteudo + localizacao
     } catch (e) {
       console.warn('fetchByRadius error', e);
       return null;
@@ -47,8 +47,8 @@ export function useARContent() {
       const url = `${base}/api/conteudo-por-regiao?nome_marca=${encodeURIComponent(nome_marca)}&tipo_regiao=${encodeURIComponent(tipo_regiao)}&nome_regiao=${encodeURIComponent(nome_regiao)}`;
       const res = await fetch(url);
       if (!res.ok) return null;
-      const j = await res.json();
-      return j;
+  const j = await res.json();
+  return j; // returns {blocos, tipo_regiao, nome_regiao}
     } catch (e) {
       console.warn('fetchByRegion error', e);
       return null;
@@ -71,7 +71,7 @@ export function useARContent() {
       if (consulta && consulta.conteudo) {
         setConteudo(consulta.conteudo);
         setLoading(false);
-        return consulta.conteudo;
+        return consulta; // return full response so caller can access localizacao/nome_regiao
       }
 
       // 2) progressive widening using radii or radius_m from admin
@@ -80,7 +80,7 @@ export function useARContent() {
         if (resp && resp.conteudo) {
           setConteudo(resp.conteudo);
           setLoading(false);
-          return resp.conteudo;
+          return resp; // return full response
         }
       }
 
@@ -101,7 +101,8 @@ export function useARContent() {
             if (regionResp && regionResp.blocos && regionResp.blocos.length) {
               setConteudo(regionResp.blocos);
               setLoading(false);
-              return regionResp.blocos;
+              // normalize return to include region metadata
+              return { conteudo: regionResp.blocos, nome_regiao: regionResp.nome_regiao, tipo_regiao: regionResp.tipo_regiao };
             }
           }
         }

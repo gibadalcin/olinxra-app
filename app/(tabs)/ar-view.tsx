@@ -1,256 +1,241 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, ScrollView, Linking, Alert } from 'react-native';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet, Linking, Alert, Platform, Dimensions, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { consumeLastARContent } from '@/utils/lastARContent';
 
+const { height: screenHeight } = Dimensions.get('window');
+
+// Definição das mensagens de estado da UI
+const UIMessages = {
+    INITIAL: 'Carregando modelo 3D...',
+    LAUNCHING: 'Iniciando AR Nativo...',
+    ERROR: 'Falha ao iniciar o AR Nativo.',
+    READY: 'Pronto para visualizar em AR.'
+};
+
+// Componente de View Principal
 export default function ARViewScreen() {
     const [payload, setPayload] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
-    // RN fallback renderer toggle removed for cleaner AR view UI
+    const [statusMessage, setStatusMessage] = useState(UIMessages.INITIAL);
+    const webRef = useRef<WebView | null>(null);
 
+    // Função auxiliar para buscar a URL do modelo GLB no payload (mantida)
+    const findModelUrl = useCallback((obj: any): string | null => {
+        if (!obj || typeof obj !== 'object') return null;
+        for (const k of Object.keys(obj)) {
+            const v = obj[k];
+            if (typeof v === 'string' && v.toLowerCase().includes('.glb')) return v;
+            if (k.toLowerCase().includes('modelurl') && typeof v === 'string') return v;
+            if (k.toLowerCase().includes('model_url') && typeof v === 'string') return v;
+            if (typeof v === 'object') { const r = findModelUrl(v); if (r) return r; }
+        }
+        return null;
+    }, []);
+
+    // Função utilitária: busca recursiva por chaves de texto (case-insensitive)
+    const findStringValue = useCallback((obj: any, keys: string[]): string | null => {
+        if (!obj || typeof obj !== 'object') return null;
+        const lowerKeys = keys.map(k => k.toLowerCase());
+
+        // 1) busca direto nas chaves do objeto
+        for (const k of Object.keys(obj)) {
+            const lowerK = k.toLowerCase();
+            if (lowerKeys.includes(lowerK) && typeof obj[k] === 'string' && String(obj[k]).trim() !== '') return String(obj[k]).trim();
+        }
+
+        // 2) busca recursiva em objetos filhos
+        for (const k of Object.keys(obj)) {
+            const v = obj[k];
+            if (v && typeof v === 'object') {
+                const r = findStringValue(v, keys);
+                if (r) return r;
+            }
+        }
+        return null;
+    }, []);
+
+    // --- CARREGAMENTO INICIAL ---
     useEffect(() => {
         const p = consumeLastARContent();
         setPayload(p);
-        setLoading(false);
+        setLoading(false); // Finaliza o loading inicial aqui
     }, []);
 
-    const webRef = useRef<any>(null);
+    // --- VARIÁVEL CHAVE: URL do Modelo Final (Totem ou Astronauta) ---
+    const finalModelUrl: string | null = useMemo(() => {
+        const payloadUrl = findModelUrl(payload);
+        if (payloadUrl) return payloadUrl;
+        return 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
+    }, [payload, findModelUrl]);
 
-    // Safe URL opener - avoid throwing on invalid links
-    async function safeOpenUrl(url?: string | null) {
-        try {
-            if (!url || typeof url !== 'string') {
-                console.warn('[ARView] safeOpenUrl: invalid url', url);
-                return;
-            }
-            const supported = await Linking.canOpenURL(url);
-            if (!supported) {
-                console.warn('[ARView] safeOpenUrl: cannot open url', url);
-                // show a non-blocking alert so user knows
-                try { Alert.alert('Link indisponível', 'Não foi possível abrir o link.'); } catch (e) { }
-                return;
-            }
-            await Linking.openURL(url);
-        } catch (e) {
-            console.warn('[ARView] safeOpenUrl failed', e, url);
+    const openNativeARWithModel = useCallback(async (modelUrl?: string | null) => {
+        if (!modelUrl) return false;
+
+        setStatusMessage(UIMessages.LAUNCHING); // Atualiza o status
+
+        const sceneViewerUrl = `https://arvr.google.com/scene-viewer/1.2?file=${encodeURIComponent(modelUrl)}&mode=ar_preferred`;
+
+        let launched = false;
+
+        // 1. Scene Viewer (HTTPS)
+        try { if (await Linking.canOpenURL(sceneViewerUrl)) { await Linking.openURL(sceneViewerUrl); launched = true; } } catch (e) { console.debug("Scene Viewer via HTTPS falhou:", e); }
+
+        // 2. Quick Look / Raw URL (iOS)
+        if (!launched && Platform.OS === 'ios') { try { await Linking.openURL(modelUrl); launched = true; } catch (e) { console.debug("Quick Look falhou:", e); } }
+
+        // 3. Intent URI (Android)
+        if (!launched && Platform.OS === 'android') {
+            const intentUrl = `intent://arvr.google.com/scene-viewer/1.2?file=${encodeURIComponent(modelUrl)}&mode=ar_preferred#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;end`;
+            try { await Linking.openURL(intentUrl); launched = true; } catch (e) { console.debug("Intent URI falhou:", e); }
         }
-    }
 
-    // WebView is the primary renderer for AR content in this POC; RN fallback removed to simplify UI
+        if (!launched) {
+            setStatusMessage(UIMessages.ERROR); // AR Nativo Falhou
+            Alert.alert('AR Indisponível', UIMessages.ERROR);
+        } else {
+            setStatusMessage(UIMessages.READY); // Volta para o estado "pronto" após o lançamento
+        }
+        return launched;
+    }, []);
 
-    // prepare an embedded, JSON-escaped payload to inject into the HTML as a fallback
-    const embeddedPayloadForHtml = React.useMemo(() => {
+    // Try to trigger the model-viewer AR flow inside the WebView first.
+    const tryOpenARInWebView = useCallback(async () => {
+        try {
+            if (webRef.current && webRef.current.injectJavaScript) {
+                // Try a few possible method names; inject JS that attempts them.
+                const js = `(function(){
+                    try {
+                        const mv = document.querySelector('model-viewer');
+                        if (!mv) return false;
+                        if (typeof mv.enterXR === 'function') { mv.enterXR(); return true; }
+                        if (typeof mv.enterAR === 'function') { mv.enterAR(); return true; }
+                        if (typeof mv.activateAR === 'function') { mv.activateAR(); return true; }
+                        // fallback: try to click an AR button in the shadow DOM
+                        try {
+                            const btn = mv.shadowRoot && mv.shadowRoot.querySelector && mv.shadowRoot.querySelector('[slot="ar-button"]');
+                            if (btn) { btn.click(); return true; }
+                        } catch(e) {}
+                        return false;
+                    } catch(e) { return false; }
+                })();true;`;
+                webRef.current.injectJavaScript(js);
+                // We cannot reliably detect success from RN side — fallback to native after a short delay
+                setTimeout(() => { openNativeARWithModel(finalModelUrl); }, 900);
+                return;
+            }
+        } catch (e) {
+            // ignore and fallback
+        }
+        // fallback
+        openNativeARWithModel(finalModelUrl);
+    }, [webRef, finalModelUrl, openNativeARWithModel]);
+
+    // --- LÓGICA DE INICIALIZAÇÃO DA MENSAGEM ---
+    useEffect(() => {
+        // Se o modelo final existe e não estamos mais carregando, o sistema está pronto para o clique
+        if (!loading && finalModelUrl) {
+            setStatusMessage(UIMessages.READY);
+        }
+    }, [loading, finalModelUrl]);
+
+    // Payload para injeção (mantido)
+    const embeddedPayloadForHtml = useMemo(() => {
         try {
             if (!payload) return 'null';
-            // escape '<' to avoid closing script tags when embedded
             return JSON.stringify({ type: 'payload', payload }).replace(/</g, '\\u003c');
         } catch (e) { return 'null'; }
     }, [payload]);
 
+    // --- Geração do HTML (AGORA COM HOTSPOT ANCORADO) ---
     const html = useMemo(() => {
+        const modelUrl = finalModelUrl || 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
+        const poster = (payload && payload.previewImage && typeof payload.previewImage === 'string' && payload.previewImage.length < 150000) ? payload.previewImage : '';
 
-        // Define a URL do modelo, usando o padrão do payload se disponível
-        const modelUrl = (payload && payload.anchorData && payload.anchorData.totem && payload.anchorData.totem.modelUrl) || 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
+        // Extração de Marca
+        const nomeMarca = String((payload && payload.anchorData && payload.anchorData.titulo) || (payload && payload.nome_marca) || 'Marca Padrão');
 
-        // Constrói dinamicamente os hotspots a partir do payload
-        let hotspotsHtml = '';
-        if (payload && payload.anchorData && payload.anchorData.totem && payload.anchorData.totem.brands) {
-            Object.entries(payload.anchorData.totem.brands).forEach(([key, brandData]: [string, any], index) => {
-                const brandKey = key.replace(/\W+/g, '_');
-                const posArr = (brandData.hotspotPosition && Array.isArray(brandData.hotspotPosition)) ? brandData.hotspotPosition : brandData.position || [0.25, 0.35 - (index * 0.1), 0.1];
-                const url = brandData.url || brandData.contentUrl || '#';
+        // Extração de localização com prioridade:
+        // 1) se houver `nome_regiao` armazenado no conteúdo, usá-lo;
+        // 2) se houver `tipo_regiao` e `endereco` (objeto do geocode), mapear para o campo apropriado (rua/bairro/cidade/estado/pais);
+        // 3) fallback para `localizacao` (string construída) ou outras chaves encontradas recursivamente.
+        const nomeRegiaoField = payload && (payload.nome_regiao || payload.nomeRegiao || payload['nome_região']) ? (payload.nome_regiao || payload.nomeRegiao || payload['nome_região']) : null;
+        const tipoRegiaoField = payload && (payload.tipo_regiao || payload.tipoRegiao) ? (payload.tipo_regiao || payload.tipoRegiao) : null;
+        const enderecoObj = payload && payload.endereco ? payload.endereco : null;
 
-                hotspotsHtml += `
-                    <button 
-                        slot="hotspot-${brandKey}" 
-                        data-position="${posArr.join(' ')}" 
-                        data-brand="${key}" 
-                        data-url="${url}"
-                        onclick="handleHotspotClick(this)"
-                        style="background: #e74c3c; border-radius: 50%; width: 20px; height: 20px; border: 3px solid #fff; cursor: pointer;"
-                        title="Clique para o Conteúdo ${key}"
-                    >
-                    </button>
-                `;
-            });
+        let chosenLocation: string | null = null;
+        if (nomeRegiaoField && String(nomeRegiaoField).trim() !== '') {
+            chosenLocation = String(nomeRegiaoField).trim();
+        } else if (tipoRegiaoField && enderecoObj && typeof enderecoObj === 'object') {
+            const t = String(tipoRegiaoField).toLowerCase();
+            // Mapear tipos comuns para chaves do Nominatim
+            if (t.includes('rua') || t.includes('logradouro') || t.includes('address') || t.includes('street')) {
+                chosenLocation = enderecoObj.road || enderecoObj.pedestrian || enderecoObj.footway || null;
+            } else if (t.includes('bairro') || t.includes('neighbourhood') || t.includes('suburb')) {
+                chosenLocation = enderecoObj.suburb || enderecoObj.neighbourhood || enderecoObj.hamlet || null;
+            } else if (t.includes('cidade') || t.includes('town') || t.includes('village') || t.includes('city')) {
+                chosenLocation = enderecoObj.city || enderecoObj.town || enderecoObj.village || null;
+            } else if (t.includes('estado') || t.includes('state') || t.includes('province')) {
+                chosenLocation = enderecoObj.state || null;
+            } else if (t.includes('pais') || t.includes('country')) {
+                chosenLocation = enderecoObj.country || null;
+            }
+            if (chosenLocation) chosenLocation = String(chosenLocation).trim();
         }
 
+        // último recurso: procurar por chaves textuais no payload (nome_regiao, localizacao, address, city...)
+        const locationKeys = ['nome_regiao', 'nome_região', 'nomeRegiao', 'localizacao', 'endereco', 'address', 'road', 'suburb', 'city', 'state', 'country'];
+        const extractedLocation = findStringValue(payload, locationKeys);
+        const localizacao = String(chosenLocation || extractedLocation || 'Localização Padrão');
+        const tituloCompleto = `${nomeMarca} | ${localizacao}`;
+
+        const bgStyle = 'background:black;'; // Fundo preto
+
+        // HOTSPOT: marca + localização (não clicável)
+        const hotspotHtml = `
+            <div 
+                slot="hotspot-marca" 
+                data-position="0 1.8 0.5" 
+                data-normal="0 0 1"
+                style="color:white; font-size:16px; font-weight:bold; background:rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 5px; transform: translate(0, -100%); pointer-events: none;">
+                ${tituloCompleto}
+            </div>`;
+
         return `
-            <!doctype html>
-            <html>
-            <head>
-                <meta name="viewport" content="width=device-width,initial-scale=1" />
-                <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-                <style>
-                    body{font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial; padding:0; margin:0; color:#111}
-                    img{max-width:100%; height:auto; border-radius:8px}
-                    .block{margin-bottom:12px}
-                    .carousel{display:flex; gap:8px; overflow-x:auto; padding:8px 0}
-                    .carousel img{flex:0 0 auto; width:140px; height:100px; object-fit:cover; border-radius:6px}
-                    /* ... (restante dos estilos CSS de botão e layout) ... */
-                </style>
-            </head>
-            <body>
+            <!doctype html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width,initial-scale=1" />
+                <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+                <style>
+                    html,body{height:100%;margin:0;${bgStyle}}
+                    #mv{width:100%;height:100vh;position:fixed;top:0;left:0;z-index:1000; background: black;}
+                    [slot^="hotspot-"] { z-index: 1000; }
+                </style>
+            </head>
+            <body>
                 <model-viewer
-                    id="totem-mv"
-                    src="${modelUrl}"
-                    alt="Totem Âncora AR"
-                    ar
-                    ar-modes="webxr scene-viewer quick-look"
-                    camera-controls
-                    shadow-intensity="1"
-                    style="width: 100%; height: 100vh; position: fixed; top: 0; left: 0; z-index: 1000;"
-                    ar-button 
-                >
-                    ${hotspotsHtml}
-                    <button slot="ar-button" style="background:#fff; color:#111; padding: 10px 20px; border-radius: 4px; border: none; position: fixed; bottom: 20px; right: 20px; z-index: 1001;">
-                        Ver em AR
-                    </button>
-                </model-viewer>
+                    id="mv"
+                    src="${modelUrl}"
+                    poster="${poster}"
+                    alt="Modelo 3D"
+                    camera-controls
+                    shadow-intensity="1"
+                    style="width: 100%; height: 100vh;"
+                >
+                    ${hotspotHtml}
+                </model-viewer>
+            </body>
+            </html>
+        `;
+    }, [payload, findModelUrl, finalModelUrl]);
 
-                <div id="root" style="position:fixed; left:0; top:0; width:100%; height:100vh; z-index:1001; overflow:hidden; background:transparent; pointer-events: none;">
-                    
-                    <div id="contentWrapper" style="padding: 12px; pointer-events: auto; background: rgba(255,255,255,0.95); border-radius: 8px; margin: 12px; display: none;">
-                        Conteúdo será injetado aqui...
-                    </div>
-                </div>
-                
-                <script>
-                    function post(type, data){ try{ window.ReactNativeWebView.postMessage(JSON.stringify(Object.assign({type:type}, data||{}))); }catch(e){} }
-                    
-                    // Ajuste a função handleHotspotClick para mostrar o overlay de conteúdo
-                    function handleHotspotClick(element){
-                        try{
-                            var url = element.getAttribute('data-url');
-                            var brand = element.getAttribute('data-brand');
-                            var root = document.getElementById('root');
-                            var wrapper = document.getElementById('contentWrapper');
-
-                            if (root && wrapper) {
-                                // 1. Torna o wrapper de conteúdo visível e o root clicável
-                                wrapper.style.display = 'block';
-                                // Injetar aqui o conteúdo dinâmico (não apenas o título como no exemplo anterior)
-                                wrapper.innerHTML = '<h2>Conteúdo de ' + (brand || 'Marca') + '</h2><p>Clique no botão abaixo para abrir o link.</p>'
-                                    + '<a href="#" onclick="window.ReactNativeWebView.postMessage(JSON.stringify({ type: \'hotspot_click\', href: \'' + url + '\', brand: \'' + brand + '\' })); return false;" class="btn primary">Abrir Conteúdo Externo</a>'
-                                    + '<button onclick="document.getElementById(\'contentWrapper\').style.display = \'none\'; document.getElementById(\'root\').style.pointerEvents = \'none\';" style="margin-left: 10px;">Fechar</button>';
-                                
-                                root.style.pointerEvents = 'auto';
-                            }
-                            
-                            // 2. Notifique o RN (apenas para logs e navegação se for o caso)
-                            post('hotspot_click', { href: url, brand: brand });
-                        }catch(e){ post('web_error', { message: 'handleHotspotClick failed: ' + (e && e.message) }); }
-                    }
-
-                    // ... (O restante das funções JS onMessage e renderPayload) ...
-                    
-                    function requestPayload(){
-                        try{ window.ReactNativeWebView && window.ReactNativeWebView.postMessage && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'request_payload' })); }catch(e){}
-                    }
-                    setTimeout(requestPayload, 120);
-                    setTimeout(requestPayload, 600);
-                    
-                    // Funções setupTotem e renderPayload foram simplificadas:
-                    
-                    function setupTotem(payload){
-                        try{
-                            var mv = document.getElementById('totem-mv');
-                            if(!mv){ post('totem_event', { event: 'modelviewer_not_found' }); return; }
-                            post('totem_event', { event: 'hotspots_injected', brandCount: Object.keys((payload.anchorData && payload.anchorData.totem && payload.anchorData.totem.brands) || {}).length });
-                        }catch(e){ post('web_error', { message: 'setupTotem failed: ' + (e && e.message) }); }
-                    }
-                    
-                    function renderPayload(payload){
-                        try{
-                            var root = document.getElementById('root');
-                            var wrapper = document.getElementById('contentWrapper');
-                            // ... (toda a lógica de normalização de blocos do seu código) ...
-                            var blocos = null;
-                            try{
-                                if(payload){
-                                    blocos = payload.blocos || payload.conteudo || null;
-                                    if(blocos && typeof blocos === 'object' && !Array.isArray(blocos)){
-                                        if(Array.isArray(blocos.blocos)) blocos = blocos.blocos;
-                                        else if(Array.isArray(blocos.conteudo)) blocos = blocos.conteudo;
-                                    }
-                                    if(Array.isArray(blocos) && blocos.length === 1 && Array.isArray(blocos[0])) blocos = blocos[0];
-                                }
-                            }catch(e){ blocos = null; }
-                            
-                            if(!payload || !blocos){ wrapper.innerHTML = 'Nenhum conteúdo disponível para exibir.'; wrapper.style.display = 'block'; return; }
-
-                            var html = '<h2>' + (payload.nome_marca || 'Conteúdo AR') + '</h2>';
-                            if(Array.isArray(blocos)){
-                                blocos.forEach(function(b){
-                                    html += '<div class="block">';
-                                    try{
-                                        var text = b.texto || b.conteudo || b.descricao || null;
-                                        if(text){ try{ if(typeof text === 'string'){ if(text.match(/(^|\s)(gs:\/\/|https?:\/\/)/i)) text = ''; } }catch(e){} if(text) html += '<p>' + (text || '') + '</p>'; }
-                                        function pickImage(o){ if(!o) return null; if(o.signed_url) return o.signed_url; if(o.url) return o.url; if(o.conteudo && typeof o.conteudo === 'string') return o.conteudo; if(o.imagem) return o.imagem; return null; }
-                                        var img = pickImage(b);
-                                        if(img) html += '<img src="' + img + '" />';
-                                        var carousel = b.items || b.itens || null;
-                                        if(Array.isArray(carousel) && carousel.length){ html += '<div class="carousel">'; carousel.forEach(function(it){ try{ var itimg = pickImage(it); if(itimg) html += '<img src="' + itimg + '" style="margin-right:8px; width:120px; height:auto;"/>'; }catch(e){} }); html += '</div>'; }
-                                        if((b.tipo && b.tipo.toString().toLowerCase().includes('botao')) || b.tipo === 'botao_destaque' || b.label){ try{ var label = b.label || (b.texto || 'Abrir'); var href = (b.action && b.action.href) ? b.action.href : (b.href || '#'); var variant = (b.variant || 'primary'); var color = b.color || null; var styleAttr = ''; if(color){ styleAttr = 'style="background:' + color + ';"'; } html += '<div style="margin-top:8px; text-align:' + (b.position || 'left') + '">'; var iconSide = (b.iconSide || b.iconPosition || 'left'); var iconHtml = '<span class="btn-icon ' + (iconSide === 'right' ? 'right' : 'left') + '">🔗</span>'; if(iconSide === 'right'){ var btnId = 'btn_' + Math.random().toString(36).slice(2); html += '<a class="btn ' + variant + '" data-id="' + btnId + '" data-href="' + href + '" href="#" ' + styleAttr + '>' + '<span class="btn-inner"><span class="btn-label">' + label + '</span>' + iconHtml + '</span>' + '</a>'; } else { var btnId = 'btn_' + Math.random().toString(36).slice(2); html += '<a class="btn ' + variant + '" data-id="' + btnId + '" data-href="' + href + '" href="#" ' + styleAttr + '>' + '<span class="btn-inner">' + iconHtml + '<span class="btn-label">' + label + '</span></span>' + '</a>'; } html += '</div>'; }catch(e){} }
-                                    }catch(e){}
-                                    html += '</div>';
-                                });
-                            }
-
-                            // INJETAR CONTEÚDO NO WRAPPER 2D
-                            try{ wrapper.innerHTML = html; wrapper.style.display = 'block'; }catch(e){ post('web_error', { message: 'failed to inject content: ' + (e && e.message) }); }
-                            
-                            // CHAMA O SETUP DO TOTEM
-                            try{ if(payload && payload.anchorMode === 'totem'){ setupTotem(payload); } }catch(e){}
-                            
-                            // ANEXAR CLICKS AO CONTEÚDO 2D (A[data-href])
-                            try{ var anchors = wrapper.querySelectorAll('a[data-href]'); anchors.forEach(function(a){ a.addEventListener('click', function(ev){ try{ ev.preventDefault(); var href = a.getAttribute('data-href'); var id = a.getAttribute('data-id'); window.ReactNativeWebView && window.ReactNativeWebView.postMessage && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'tag_click', href: href, id: id })); }catch(e){} }); }); }catch(e){}
-
-                        }catch(e){ document.getElementById('root').innerText = 'Erro ao renderizar conteúdo.'; }
-                    }
-
-                    function onMessage(e){
-                        try{
-                            var data = e && e.data ? e.data : (window && window.__RN_MESSAGE__ ? window.__RN_MESSAGE__ : null);
-                            if(!data) return;
-                            var msg = typeof data === 'string' ? JSON.parse(data) : data;
-                            try{ window.ReactNativeWebView && window.ReactNativeWebView.postMessage && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'received_raw', summary: (typeof msg === 'string' ? msg.slice(0,200) : (msg && msg.type ? msg.type : 'object')) })); }catch(e){}
-                            if(msg && msg.type === 'payload' && msg.payload){
-                                renderPayload(msg.payload);
-                                try{ window.ReactNativeWebView && window.ReactNativeWebView.postMessage && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'rendered', ok: true })); }catch(e){}
-                                return;
-                            }
-                            if(msg && msg.type === 'request_payload') return;
-                            renderPayload(msg);
-                            try{ window.ReactNativeWebView && window.ReactNativeWebView.postMessage && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'rendered', ok: true })); }catch(e){}
-                        }catch(err){
-                            document.getElementById('root').innerText = 'Erro ao renderizar conteúdo.';
-                            try{ window.ReactNativeWebView && window.ReactNativeWebView.postMessage && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'rendered', ok: false, error: String(err) })); }catch(e){}
-                        }
-                    }
-
-                    document.addEventListener('message', onMessage);
-                    window.addEventListener('message', onMessage);
-                    try{ if(window.__RN_MESSAGE__) onMessage({ data: window.__RN_MESSAGE__ }); } catch(e){}
-                    try{ if(${embeddedPayloadForHtml} && ${embeddedPayloadForHtml} !== 'null') onMessage({ data: ${embeddedPayloadForHtml} }); } catch(e){}
-                </script>
-            </body>
-            </html>
-        `;
-    }, [embeddedPayloadForHtml, payload]); // Adicionei 'payload' aqui para reconstruir a HTML no caso de mudança de dados.
-
-    // send payload via postMessage after a tick, with a couple retries
+    // Envio de Payload (mantido)
     useEffect(() => {
         const send = () => {
             try {
                 if (webRef.current && payload) {
-                    console.debug('[ARView] posting payload to WebView', payload && (payload.nome_marca || 'payload'));
-                    webRef.current.postMessage(JSON.stringify({ type: 'payload', payload }));
-                    // also set a window var as fallback for some platforms
-                    const setFallback = `(function(){try{window.__RN_MESSAGE__ = ${JSON.stringify({ type: 'payload', payload })};}catch(e){}})();true;`;
-                    webRef.current.injectJavaScript && webRef.current.injectJavaScript(setFallback);
-                    // dynamic totem injection removed - <model-viewer> is static in the HTML and hotspots are handled via setupTotem
-                    console.debug('[ARView] postMessage + injectJavaScript attempted');
+                    webRef.current.injectJavaScript && webRef.current.injectJavaScript(`(function(){window.__RN_MESSAGE__ = ${embeddedPayloadForHtml};})();true;`);
                 }
             } catch (e) { }
         };
@@ -258,66 +243,155 @@ export default function ARViewScreen() {
         const t1 = setTimeout(send, 300);
         const t2 = setTimeout(send, 900);
         return () => { try { clearTimeout(t1); clearTimeout(t2); } catch (e) { } };
-    }, [payload]);
-    // handle messages coming FROM the WebView (including request_payload)
-    const handleWebViewMessage = React.useCallback((event: any) => {
+    }, [payload, embeddedPayloadForHtml]);
+
+    // Manipulador de Mensagens WebView -> Nativo
+    const [showContentOverlay, setShowContentOverlay] = useState(false);
+    const [contentBlocks, setContentBlocks] = useState<any[]>([]);
+    const [pendingOpenContent, setPendingOpenContent] = useState(false);
+
+    const handleWebViewMessage = useCallback((event: any) => {
         try {
-            const d = JSON.parse(event.nativeEvent.data);
-            if (d && d.type === 'request_payload') {
-                console.debug('[ARView] WebView requested payload');
-                if (webRef.current && payload) {
-                    webRef.current.postMessage(JSON.stringify({ type: 'payload', payload }));
-                    console.debug('[ARView] responded to request_payload');
+            const data = event && event.nativeEvent && event.nativeEvent.data ? event.nativeEvent.data : null;
+            if (!data) return;
+            let parsed = null;
+            try { parsed = JSON.parse(data); } catch (e) { parsed = null; }
+            if (parsed && parsed.type === 'hotspot' && parsed.action === 'open_content') {
+                // derive blocks from payload
+                const blocks = (payload && (payload.blocos || payload.conteudo || payload.blocos)) || [];
+                // normalize: if payload.conteudo is an object {blocos: []}
+                let normalized: any[] = [];
+                if (Array.isArray(blocks)) normalized = blocks;
+                else if (blocks && typeof blocks === 'object' && Array.isArray(blocks.blocos)) normalized = blocks.blocos;
+                else normalized = [];
+                setContentBlocks(normalized);
+                // If AR scene isn't ready yet, postpone opening until ready
+                if (statusMessage !== UIMessages.READY) {
+                    setPendingOpenContent(true);
+                } else {
+                    setShowContentOverlay(true);
                 }
-                return;
             }
-            // tag click from WebView (button/tag inside HTML)
-            if (d && d.type === 'tag_click') {
-                try {
-                    console.debug('[ARView] tag clicked in WebView', d);
-                    if (d.href) safeOpenUrl(d.href);
-                } catch (e) { console.debug('[ARView] failed to open tag href', e); }
-                return;
-            }
-            // hotspot click from model-viewer
-            if (d && d.type === 'hotspot_click') {
-                try {
-                    console.debug('[ARView] hotspot clicked in WebView', d);
-                    if (d.href) safeOpenUrl(d.href);
-                } catch (e) { console.debug('[ARView] failed to handle hotspot_click', e); }
-                return;
-            }
-            // debug notifications coming from WebView (received_raw, rendered, etc.)
-            if (d && d.type) {
-                console.debug('[ARView] message from WebView type=' + d.type, d);
-            } else {
-                console.debug('[ARView] got message from WebView', d);
-            }
-        } catch (e) { console.debug('[ARView] got message (non-json)'); }
+        } catch (e) {
+            console.debug('[ARView] handleWebViewMessage error', e);
+        }
     }, [payload]);
 
-    if (loading) return <View style={styles.center}><ActivityIndicator /></View>;
-    if (!payload) return <View style={styles.center}><Text>Nenhum conteúdo disponível para exibir.</Text></View>;
+    // If a hotspot requested open before the AR scene was ready, open when ready
+    useEffect(() => {
+        if (pendingOpenContent && statusMessage === UIMessages.READY) {
+            setPendingOpenContent(false);
+            setShowContentOverlay(true);
+        }
+    }, [pendingOpenContent, statusMessage]);
+
+    // --- Renderização ---
+
+    // Estado 1: Carregamento Inicial
+    if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#0000ff" /><Text style={styles.launchText}>Buscando conteúdo...</Text></View>;
+
+    // Estado 2: Payload Ausente / Modelo não encontrado
+    if (!payload || !finalModelUrl) {
+        return <View style={styles.center}><Text style={styles.launchText}>Nenhum modelo 3D associado para AR.</Text></View>;
+    }
+
+    // Estado 3: Renderização do WebView + Overlays Nativos
+    const isReady = statusMessage !== UIMessages.INITIAL && statusMessage !== UIMessages.LAUNCHING;
 
     return (
-        <View style={{ flex: 1 }}>
-            <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-                <View style={{ flex: 1, height: 600 }}>
-                    <WebView
-                        ref={webRef}
-                        originWhitelist={["*"]}
-                        source={{ html }}
-                        javaScriptEnabled={true}
-                        domStorageEnabled={true}
-                        style={{ flex: 1 }}
-                        onMessage={handleWebViewMessage}
-                    />
+        <View style={styles.fullScreenContainer}>
+            {/* 1. WebView com o Modelo 3D (ONDE O TÍTULO ESTÁ ANCORADO) */}
+            <View style={{ flex: 1, height: screenHeight, position: 'absolute', top: 0, left: 0, right: 0 }}>
+                <WebView
+                    ref={webRef}
+                    originWhitelist={["*"]}
+                    source={{ html }}
+                    javaScriptEnabled={true}
+                    domStorageEnabled={true}
+                    onMessage={handleWebViewMessage}
+                    style={{ flex: 1, backgroundColor: 'transparent' }}
+                />
+            </View>
+
+
+            {/* 2. OVERLAYS NATIVOS (Mensagem e Botão de Ação) */}
+            <View style={styles.overlayNative}>
+                {/* Mensagem de Status */}
+                <Text style={styles.launchText}>{statusMessage}</Text>
+
+                {/* BOTÃO "VER EM RA" (Posição Fixa) */}
+                <View style={styles.bottomBar}>
+                    <TouchableOpacity
+                        style={[styles.mainActionButton, !isReady && { opacity: 0.5 }]}
+                        onPress={() => isReady && tryOpenARInWebView()}
+                        disabled={!isReady}
+                    >
+                        <Text style={styles.mainActionText}>VER EM RA</Text>
+                    </TouchableOpacity>
                 </View>
-            </ScrollView>
+
+            </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' }
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'black' },
+    fullScreenContainer: { flex: 1, backgroundColor: 'black' },
+    launchText: { color: 'white', marginTop: 10 },
+    bottomBar: {
+        position: 'absolute',
+        bottom: 50,
+        zIndex: 10,
+        width: '100%',
+        alignItems: 'center',
+    },
+    mainActionButton: {
+        backgroundColor: '#3498db',
+        paddingHorizontal: 30,
+        paddingVertical: 15,
+        borderRadius: 30,
+    },
+    mainActionText: {
+        color: 'white',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    overlayNative: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 2,
+        alignItems: 'center',
+        paddingTop: 50,
+        pointerEvents: 'box-none',
+    },
+    contentOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        zIndex: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 16,
+    },
+    contentCard: {
+        width: '94%',
+        maxHeight: '78%',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 12,
+    },
+    contentTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8, color: '#111' },
+    contentScroll: { maxHeight: 380 },
+    blockRow: { flexDirection: 'row', marginBottom: 10, alignItems: 'center' },
+    blockImage: { width: 110, height: 80, marginRight: 10, borderRadius: 6, resizeMode: 'cover' },
+    blockText: { flex: 1, color: '#222' },
+    closeButton: { marginTop: 8, backgroundColor: '#3498db', padding: 10, borderRadius: 8, alignItems: 'center' },
+    closeButtonText: { color: 'white', fontWeight: '700' },
 });
