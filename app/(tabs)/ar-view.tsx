@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet, Linking, Alert, Platform, Dimensions, TouchableOpacity } from 'react-native';
+import { API_CONFIG } from '../../config/api';
 import { WebView } from 'react-native-webview';
 import { consumeLastARContent } from '@/utils/lastARContent';
 
@@ -55,6 +56,25 @@ export default function ARViewScreen() {
         return null;
     }, []);
 
+    function safePreview(str?: string | null, max = 120) {
+        if (!str) return 'nulo'
+        try {
+            const isData = str.startsWith && str.startsWith('data:')
+            const len = str.length
+            if (isData) {
+                // don't include the whole base64 in Alerts — show type and length and a tiny prefix
+                const prefix = str.slice(0, Math.min(64, str.length))
+                return `${prefix}... (data: base64, length=${len})`
+            }
+            if (str.length > max) {
+                return `${str.slice(0, max)}... (length=${len})`
+            }
+            return str
+        } catch (e) {
+            return 'nulo'
+        }
+    }
+
     // --- CARREGAMENTO INICIAL ---
     useEffect(() => {
         const p = consumeLastARContent();
@@ -99,37 +119,7 @@ export default function ARViewScreen() {
         return launched;
     }, []);
 
-    // Try to trigger the model-viewer AR flow inside the WebView first.
-    const tryOpenARInWebView = useCallback(async () => {
-        try {
-            if (webRef.current && webRef.current.injectJavaScript) {
-                // Try a few possible method names; inject JS that attempts them.
-                const js = `(function(){
-                    try {
-                        const mv = document.querySelector('model-viewer');
-                        if (!mv) return false;
-                        if (typeof mv.enterXR === 'function') { mv.enterXR(); return true; }
-                        if (typeof mv.enterAR === 'function') { mv.enterAR(); return true; }
-                        if (typeof mv.activateAR === 'function') { mv.activateAR(); return true; }
-                        // fallback: try to click an AR button in the shadow DOM
-                        try {
-                            const btn = mv.shadowRoot && mv.shadowRoot.querySelector && mv.shadowRoot.querySelector('[slot="ar-button"]');
-                            if (btn) { btn.click(); return true; }
-                        } catch(e) {}
-                        return false;
-                    } catch(e) { return false; }
-                })();true;`;
-                webRef.current.injectJavaScript(js);
-                // We cannot reliably detect success from RN side — fallback to native after a short delay
-                setTimeout(() => { openNativeARWithModel(finalModelUrl); }, 900);
-                return;
-            }
-        } catch (e) {
-            // ignore and fallback
-        }
-        // fallback
-        openNativeARWithModel(finalModelUrl);
-    }, [webRef, finalModelUrl, openNativeARWithModel]);
+    // Removed in-WebView AR trigger; we now generate/launch GLB from backend when needed
 
     // --- LÓGICA DE INICIALIZAÇÃO DA MENSAGEM ---
     useEffect(() => {
@@ -245,45 +235,153 @@ export default function ARViewScreen() {
         return () => { try { clearTimeout(t1); clearTimeout(t2); } catch (e) { } };
     }, [payload, embeddedPayloadForHtml]);
 
-    // Manipulador de Mensagens WebView -> Nativo
-    const [showContentOverlay, setShowContentOverlay] = useState(false);
-    const [contentBlocks, setContentBlocks] = useState<any[]>([]);
-    const [pendingOpenContent, setPendingOpenContent] = useState(false);
+    // Hotspot/message handling removed — não usamos mais hotspots clicáveis
 
-    const handleWebViewMessage = useCallback((event: any) => {
-        try {
-            const data = event && event.nativeEvent && event.nativeEvent.data ? event.nativeEvent.data : null;
-            if (!data) return;
-            let parsed = null;
-            try { parsed = JSON.parse(data); } catch (e) { parsed = null; }
-            if (parsed && parsed.type === 'hotspot' && parsed.action === 'open_content') {
-                // derive blocks from payload
-                const blocks = (payload && (payload.blocos || payload.conteudo || payload.blocos)) || [];
-                // normalize: if payload.conteudo is an object {blocos: []}
-                let normalized: any[] = [];
-                if (Array.isArray(blocks)) normalized = blocks;
-                else if (blocks && typeof blocks === 'object' && Array.isArray(blocks.blocos)) normalized = blocks.blocos;
-                else normalized = [];
-                setContentBlocks(normalized);
-                // If AR scene isn't ready yet, postpone opening until ready
-                if (statusMessage !== UIMessages.READY) {
-                    setPendingOpenContent(true);
-                } else {
-                    setShowContentOverlay(true);
+    // Helper: prefere explicitamente a imagem header (subtipo 'header' ou tipo contendo 'topo'),
+    // se não existir, cai para a primeira imagem disponível (signed_url > url)
+    const findFirstImageUrl = useCallback((p: any): string | null => {
+        if (!p) return null;
+        const blocks = p.blocos || p.conteudo || [];
+        if (!Array.isArray(blocks)) return null;
+
+        // 1) procura por bloco com subtype/header explicitamente (prioridade)
+        for (const b of blocks) {
+            if (!b || typeof b !== 'object') continue;
+            const subtipo = (b.subtipo || b.subType || '').toString().toLowerCase();
+            const tipoLabel = (b.tipo || '').toString().toLowerCase();
+            if (subtipo === 'header' || tipoLabel.includes('topo') || tipoLabel.includes('header')) {
+                if (typeof b.signed_url === 'string' && b.signed_url) return b.signed_url;
+                if (typeof b.url === 'string' && b.url) return b.url;
+                // carousel/itens dentro do header
+                if (Array.isArray(b.items)) {
+                    for (const it of b.items) {
+                        if (!it) continue;
+                        if (typeof it.signed_url === 'string' && it.signed_url) return it.signed_url;
+                        if (typeof it.url === 'string' && it.url) return it.url;
+                    }
                 }
             }
-        } catch (e) {
-            console.debug('[ARView] handleWebViewMessage error', e);
         }
-    }, [payload]);
 
-    // If a hotspot requested open before the AR scene was ready, open when ready
-    useEffect(() => {
-        if (pendingOpenContent && statusMessage === UIMessages.READY) {
-            setPendingOpenContent(false);
-            setShowContentOverlay(true);
+        // 2) fallback: primeira imagem assinada ou url encontrada
+        for (const b of blocks) {
+            if (!b) continue;
+            if (typeof b.signed_url === 'string' && b.signed_url) return b.signed_url;
+            if (typeof b.url === 'string' && b.url) return b.url;
+            if (Array.isArray(b.items)) {
+                for (const it of b.items) {
+                    if (!it) continue;
+                    if (typeof it.signed_url === 'string' && it.signed_url) return it.signed_url;
+                    if (typeof it.url === 'string' && it.url) return it.url;
+                }
+            }
         }
-    }, [pendingOpenContent, statusMessage]);
+
+        return null;
+    }, []);
+
+    const handleVerEmRA = useCallback(async () => {
+        // quick debug: quem está no payload agora?
+        try {
+            const blocks = (payload && (payload.blocos || payload.conteudo)) || [];
+            const blocksCount = Array.isArray(blocks) ? blocks.length : 0;
+            const payloadKeys = payload ? Object.keys(payload).slice(0, 10).join(',') : 'nenhum';
+            const payloadModel = findModelUrl(payload);
+            const imageCandidate = findFirstImageUrl(payload);
+            console.log('[AR DEBUG] payloadKeys:', payloadKeys, 'blocksCount:', blocksCount);
+            console.log('[AR DEBUG] modelCandidate:', payloadModel, 'imageCandidate:', imageCandidate);
+            try { Alert.alert('AR Debug', `model: ${payloadModel || 'nulo'}\nimage: ${safePreview(imageCandidate)}\nblocks: ${blocksCount}`); } catch (e) { }
+        } catch (e) { console.warn('[AR DEBUG] erro ao inspecionar payload', e); }
+
+        // 1) se o payload já traz um modelo (.glb) use-o
+        const payloadModel = findModelUrl(payload);
+        if (payloadModel) {
+            openNativeARWithModel(payloadModel);
+            return;
+        }
+
+        // 2) tenta gerar um GLB a partir da primeira imagem do payload via backend
+        let imageUrl = findFirstImageUrl(payload);
+
+        // Se não encontrou blocos, tenta fallbacks: payload.previewImage (quando for URL)
+        if (!imageUrl) {
+            const preview = payload && typeof payload.previewImage === 'string' ? payload.previewImage : null;
+            const anchorPreview = payload && payload.anchorData && typeof payload.anchorData.previewDataUrl === 'string' ? payload.anchorData.previewDataUrl : (payload && payload.anchorData && typeof payload.anchorData.previewImage === 'string' ? payload.anchorData.previewImage : null);
+
+            if (preview && (preview.startsWith('http://') || preview.startsWith('https://'))) {
+                imageUrl = preview;
+                console.log('[AR] usando payload.previewImage como fallback:', safePreview(imageUrl));
+                try { Alert.alert('AR Debug', `Usando previewImage como fallback\n${safePreview(imageUrl)}`); } catch (e) { }
+            } else if (anchorPreview && (anchorPreview.startsWith('http://') || anchorPreview.startsWith('https://'))) {
+                imageUrl = anchorPreview;
+                console.log('[AR] usando anchorData.previewDataUrl como fallback:', safePreview(imageUrl));
+                try { Alert.alert('AR Debug', `Usando anchor preview como fallback\n${safePreview(imageUrl)}`); } catch (e) { }
+            } else if (preview && preview.startsWith('data:')) {
+                // Temos uma preview em base64 (data URL). O backend agora aceita data URLs — usamos como imageUrl.
+                imageUrl = preview;
+                console.log('[AR] usando previewImage (data: base64) como fallback e enviando ao backend');
+                try { Alert.alert('AR Debug', 'Usando preview embutido (base64) como imagem para gerar GLB.'); } catch (e) { }
+                // continua o fluxo enviando imageUrl (data:) para o backend
+            } else {
+                Alert.alert('Conteúdo não disponível', 'Nenhuma mídia encontrada para abrir em AR.');
+                // fallback para astronauta
+                openNativeARWithModel(finalModelUrl);
+                return;
+            }
+        }
+
+        try {
+            setStatusMessage('Gerando modelo AR...');
+
+            // Mostra alert visível com a imageUrl para garantir feedback no dispositivo
+            try {
+                Alert.alert('AR Debug', `Enviando image_url: ${safePreview(imageUrl)}`);
+            } catch (e) { /* não bloquear se Alert falhar */ }
+
+            // Debug: qual URL estamos enviando para o backend (Metro)
+            console.log('[AR] Gerar GLB para image_url:', safePreview(imageUrl));
+
+            const res = await fetch(`${API_CONFIG.BASE_URL}/api/generate-glb-from-image`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image_url: imageUrl, filename: `conteudo_${Date.now()}.glb` })
+            });
+
+            // Log do status e do corpo (text) para diagnóstico
+            const respText = await res.text();
+            console.log('[AR] resposta generate-glb-from-image status:', res.status, 'body:', respText.substring(0, 1000));
+
+            if (!res.ok) {
+                // se não OK, mostra o texto retornado para ajudar a diagnosticar
+                console.warn('[AR] generate-glb-from-image failed', res.status, respText);
+                try { Alert.alert('Erro ao gerar modelo AR', `Status ${res.status}\n${respText.substring(0, 200)}`); } catch (e) { }
+                openNativeARWithModel(finalModelUrl);
+                return;
+            }
+
+            // tenta parsear JSON seguro
+            let j: any = null;
+            try { j = respText ? JSON.parse(respText) : {}; } catch (e) { console.warn('[AR] parse JSON falhou', e); }
+
+            const glbUrl = j && (j.glb_signed_url || j.glb_url || j.glbSignedUrl);
+            if (glbUrl) {
+                console.log('[AR] GLB gerado:', glbUrl);
+                try { Alert.alert('GLB Gerado', `${glbUrl}`); } catch (e) { }
+                openNativeARWithModel(glbUrl);
+                return;
+            }
+
+            console.warn('[AR] generate-glb-from-image: sem glb na resposta', j || respText);
+            try { Alert.alert('Erro', `Resposta inválida do servidor.\n${(respText || '').substring(0, 200)}`); } catch (e) { }
+            openNativeARWithModel(finalModelUrl);
+        } catch (e) {
+            console.warn('Erro gerando GLB:', e);
+            try { Alert.alert('Erro', 'Não foi possível gerar o modelo AR. Abrindo fallback.'); } catch (e) { }
+            openNativeARWithModel(finalModelUrl);
+        } finally {
+            setStatusMessage(UIMessages.READY);
+        }
+    }, [payload, finalModelUrl, findModelUrl, findFirstImageUrl, openNativeARWithModel]);
 
     // --- Renderização ---
 
@@ -308,7 +406,6 @@ export default function ARViewScreen() {
                     source={{ html }}
                     javaScriptEnabled={true}
                     domStorageEnabled={true}
-                    onMessage={handleWebViewMessage}
                     style={{ flex: 1, backgroundColor: 'transparent' }}
                 />
             </View>
@@ -323,7 +420,7 @@ export default function ARViewScreen() {
                 <View style={styles.bottomBar}>
                     <TouchableOpacity
                         style={[styles.mainActionButton, !isReady && { opacity: 0.5 }]}
-                        onPress={() => isReady && tryOpenARInWebView()}
+                        onPress={() => isReady && handleVerEmRA()}
                         disabled={!isReady}
                     >
                         <Text style={styles.mainActionText}>VER EM RA</Text>
