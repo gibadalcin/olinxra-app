@@ -12,7 +12,6 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-
 // Try to initialize Firebase Auth with React Native persistence (AsyncStorage)
 // if the optional package is installed. This avoids the runtime warning and
 // persists anonymous sign-in between sessions. If the package is not
@@ -36,5 +35,4 @@ try {
   // while focusing on rendering correctness.
   auth = getAuth(app);
 }
-
 export { auth };
