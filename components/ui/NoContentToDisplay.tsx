@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, View, StyleSheet, ActivityIndicator, Text, Button } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { Image } from 'expo-image';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface LoadingCaptureModalProps {
   visible: boolean;
@@ -40,7 +40,7 @@ export function LoadingCaptureModal({ visible, onFinish, onCancel, result, minDu
   }
 
   return (
-    <Modal visible={show} transparent animationType="fade">
+    <Modal visible={show} transparent statusBarTranslucent animationType="fade">
       <View style={styles.overlay}>
         <ActivityIndicator size="large" color={Colors.global.blueLight} />
       </View>
@@ -51,21 +51,26 @@ export function LoadingCaptureModal({ visible, onFinish, onCancel, result, minDu
 interface NoContentToDisplayProps {
   visible: boolean;
   onCancel?: () => void;
+  brand?: string | null;
+  location?: string | null;
 }
 
-export function NoContentToDisplayModal({ visible, onCancel }: NoContentToDisplayProps) {
+export function NoContentToDisplayModal({ visible, onCancel, brand, location }: NoContentToDisplayProps) {
+  const displayBrand = brand || 'desconhecida';
+  // Nota: location era calculada mas não usada — mantemos apenas a marca para esta modal
+
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible} transparent statusBarTranslucent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.content}>
           <Image
             source={require('../../assets/images/adaptive-icon.png')}
             style={styles.logo}
             contentFit='contain' />
-          <Text style={styles.title}>Ops! Não existe conteúdo associado à marca na região de XXXX</Text>
+          <Text style={styles.title}>Ops! Não existe conteúdo associado à marca {displayBrand} nessa localização</Text>
           <Text style={styles.subtitle}>
             Tente capturar outra logomarca ou explore o ambiente{' '}
-            <MaterialIcons name="explore" size={18} color={Colors.light.icon} />
+            <MaterialCommunityIcons name="magnify-expand" size={18} color={Colors.light.icon} />
             {' '}em busca de conteúdo dinâmico.
           </Text>
           <Button title="Fechar" onPress={onCancel} />
@@ -77,7 +82,11 @@ export function NoContentToDisplayModal({ visible, onCancel }: NoContentToDispla
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',

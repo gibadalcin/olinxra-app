@@ -8,12 +8,21 @@
     "android": {
       "permissions": [
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
       ]
     },
     "plugins": [
       "expo-router",
       "expo-web-browser"
-    ]
+    ],
+    "ios": {
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Ative a localização para encontrarmos conteúdo AR próximo e acelerar suas buscas.",
+        "NSCameraUsageDescription": "Precisamos acessar a câmera para capturar logomarcas e iniciar experiências AR.",
+        "NSPhotoLibraryUsageDescription": "Precisamos acessar suas fotos para permitir envio e comparação de imagens."
+      }
+    }
   }
 }

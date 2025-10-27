@@ -24,19 +24,13 @@ export default function TabLayout() {
                     tabBar={props => <CustomTabBar {...props} />}
                 >
                     <Tabs.Screen
-                        name="index"
+                        name="recognizer"
                         options={{
                             headerShown: false,
                         }}
                     />
                     <Tabs.Screen
                         name="explorer"
-                        options={{
-                            headerShown: false,
-                        }}
-                    />
-                    <Tabs.Screen
-                        name="recognizer"
                         options={{
                             headerShown: false,
                         }}
@@ -49,6 +43,12 @@ export default function TabLayout() {
                     />
                     <Tabs.Screen
                         name="options"
+                        options={{
+                            headerShown: false,
+                        }}
+                    />
+                    <Tabs.Screen
+                        name="ar-view"
                         options={{
                             headerShown: false,
                         }}

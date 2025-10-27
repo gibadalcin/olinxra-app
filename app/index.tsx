@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Animated, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 
 // Esconde o cabeçalho da Stack para esta página
@@ -13,7 +14,7 @@ export default function Splash() {
     const [progress, setProgress] = useState(0);
     const fadeAnim = useState(new Animated.Value(1))[0];
     const router = useRouter();
-    const logo = useMemo(() => require("@/assets/images/logo-splash.png"), []);
+    const logo = require("@/assets/images/logo-splash.png");
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -25,7 +26,7 @@ export default function Splash() {
                         duration: 600,
                         useNativeDriver: true,
                     }).start(() => {
-                        router.replace("/(tabs)");
+                        router.replace("/(tabs)/recognizer");
                     });
                     return 100;
                 }
@@ -50,17 +51,21 @@ export default function Splash() {
                     accessible
                     accessibilityLabel="Tela de carregamento OlinxRA"
                 >
+
                     <Image
                         source={logo}
                         style={{
-                            width: "60%",
-                            height: "100%",
+                            width: "68%",
+                            maxHeight: 160,
                             resizeMode: "contain",
-                            marginBottom: "auto",
-                            marginTop: "auto"
+                            marginTop: 0
                         }}
                         accessibilityLabel="Logo OlinxRA"
                     />
+                    <ThemedText style={{ marginTop: -40, fontSize: 16, color: Colors.global.light }}>
+                        Reconheça. Localize. Explore.
+                    </ThemedText>
+
                     <View
                         style={{
                             position: "absolute",

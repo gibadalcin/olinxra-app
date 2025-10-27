@@ -1,8 +1,9 @@
-import { Image } from 'react-native';
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { useCaptureSettings } from '@/context/CaptureSettingsContext';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, Dimensions } from "react-native";
+import CustomHeader from '@/components/CustomHeader';
 import { CameraView, Camera } from "expo-camera";
+import * as Location from 'expo-location';
 import * as ImagePicker from "expo-image-picker";
 import PermissionRequest from "@/components/ui/PermissionRequest";
 import { Colors } from "@/constants/Colors";
@@ -66,7 +67,10 @@ export default function RecognizerHome() {
         const galleryStatus = request
             ? await ImagePicker.requestMediaLibraryPermissionsAsync()
             : await ImagePicker.getMediaLibraryPermissionsAsync();
-        const granted = cameraStatus.status === 'granted' && galleryStatus.status === 'granted';
+        const locStatus = request
+            ? await Location.requestForegroundPermissionsAsync()
+            : await Location.getForegroundPermissionsAsync();
+        const granted = cameraStatus.status === 'granted' && galleryStatus.status === 'granted' && locStatus.status === 'granted';
         setHasPermission(granted);
         return granted;
     }, []);
@@ -108,7 +112,6 @@ export default function RecognizerHome() {
         }
     }, [cameraRef, isProcessing, handlePermissions]);
 
-    // Renderização
     if (hasPermission === null) {
         return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={Colors["light"]?.background || "#fff"} /></View>;
     }
@@ -118,13 +121,9 @@ export default function RecognizerHome() {
 
     return (
         <View style={styles.container}>
-            {/* Header customizado fixo no topo */}
-            <View style={styles.customHeader}>
-                <Image
-                    source={require('@/assets/images/adaptive-icon-w.png')}
-                    style={styles.headerIcon}
-                />
-                <Text style={styles.headerText}>{headerTitle}</Text>
+            {/* Header customizado (agora reutilizável) sobreposto */}
+            <View style={styles.headerOverlay} pointerEvents="box-none">
+                <CustomHeader title={headerTitle} transparent />
             </View>
             <GestureDetector gesture={pinchGesture}>
                 <View style={{ flex: 1 }}>
@@ -173,25 +172,6 @@ export default function RecognizerHome() {
 }
 
 const styles = StyleSheet.create({
-    customHeader: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: '12%',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: '12%',
-        paddingBottom: 8,
-        paddingHorizontal: 16,
-        zIndex: 100,
-        backgroundColor: 'transparent', // glass effect
-        borderBottomLeftRadius: 18,
-        borderBottomRightRadius: 18,
-        overflow: 'hidden',
-        gap: 8,
-    },
     headerIcon: {
         width: 32,
         height: 32,
@@ -260,7 +240,7 @@ const styles = StyleSheet.create({
     glassText: {
         color: Colors["light"]?.background || "#ffffff",
         fontSize: 18,
-        fontWeight: 'bold',
+        fontWeight: '500',
         textShadowColor: 'rgba(0,0,0,0.12)',
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 2,
@@ -270,5 +250,12 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: -10,
         zIndex: 10,
+    },
+    headerOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 20,
     },
 });

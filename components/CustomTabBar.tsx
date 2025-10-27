@@ -8,7 +8,6 @@ import { ThemedText } from "./ThemedText";
 import { Colors } from "@/constants/Colors";
 
 const icons = [
-    { name: "home", label: "Home", route: "/(tabs)/", family: Ionicons },
     { name: "camera", label: "Capturar", route: "/(tabs)/recognizer", family: Ionicons },
     { name: "magnify-expand", label: "Explorar", route: "/(tabs)/explorer", family: MaterialCommunityIcons },
     { name: "help-circle", label: "Ajuda", route: "/(tabs)/help", family: Ionicons },
@@ -23,6 +22,7 @@ export default function CustomTabBar({ state }: { state: NavigationState }) {
     const router = useRouter();
     const segments = useSegments();
     const activeRoute = segments[segments.length - 1] || "index";
+    // No local permission flags — tabs always enabled. Permission gating happens in the Recognizer screen.
 
     if (!state || !state.routes) {
         return null;
@@ -44,23 +44,26 @@ export default function CustomTabBar({ state }: { state: NavigationState }) {
                 const routeSegment = icon.route.split("/").filter(Boolean).pop();
                 const isActive = (icon.route === "/(tabs)/" && activeRoute === "index") || activeRoute === routeSegment;
 
+                // Tabs are always enabled; the Recognizer screen handles permission checks itself.
+                const disabledForCamera = false;
                 return (
                     <TouchableOpacity
                         key={icon.name}
-                        onPress={() => router.replace(icon.route)}
+                        onPress={() => { if (!disabledForCamera) router.replace(icon.route); }}
                         style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+                        accessibilityState={{ disabled: disabledForCamera }}
                     >
                         <icon.family
                             name={icon.name as any}
                             size={28}
-                            color={isActive ? activeColor : inactiveColor}
-                            style={{ opacity: isActive ? 1 : inactiveOpacity }}
+                            color={isActive ? activeColor : (disabledForCamera ? '#888' : inactiveColor)}
+                            style={{ opacity: isActive ? 1 : (disabledForCamera ? 0.4 : inactiveOpacity) }}
                         />
                         <ThemedText
                             style={{
                                 fontSize: 10,
-                                color: isActive ? activeColor : inactiveColor,
-                                opacity: isActive ? 1 : inactiveOpacity,
+                                color: isActive ? activeColor : (disabledForCamera ? '#888' : inactiveColor),
+                                opacity: isActive ? 1 : (disabledForCamera ? 0.6 : inactiveOpacity),
                                 marginTop: -2,
                             }}
                         >

@@ -2,29 +2,18 @@ import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { useCaptureSettings } from '@/context/CaptureSettingsContext';
-import { Switch, View, Image, Text, StyleSheet } from 'react-native';
+import { Switch, StyleSheet, Alert, Platform, BackHandler, TouchableOpacity } from 'react-native';
+import CustomHeader from '@/components/CustomHeader';
 
-const headerTitle = "Configurações globais";
+const headerTitle = "Opções de configuração";
 
 export default function Options() {
 
     const { showOrientation, setShowOrientation } = useCaptureSettings();
-
+    // options no longer persist or control permission flags.
     return (
         <ThemedView style={{ flex: 1 }}>
-            {/* Header customizado fixo no topo */}
-            <View style={styles.customHeader}>
-                <View style={styles.customHeaderContent}>
-                    <Image
-                        source={require('@/assets/images/adaptive-icon-w.png')}
-                        style={styles.headerIcon}
-                    />
-                    <View>
-                        <Text style={styles.headerText}>{headerTitle}</Text>
-                    </View>
-                </View>
-            </View>
-
+            <CustomHeader title={headerTitle} />
 
             <ThemedView style={styles.container}>
                 {/* Bloco de funções de sistema */}
@@ -53,54 +42,25 @@ export default function Options() {
                         Versão {require('../../package.json').version}
                     </ThemedText>
                 </ThemedView>
+                {/* simulated permission modal removed - native OS prompts will be used */}
             </ThemedView>
         </ThemedView>
     );
 }
 
 const styles = StyleSheet.create({
-    customHeader: {
-        height: 100,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: Colors.global.bg + 'ee',
-        paddingTop: 30,
-        paddingBottom: 0,
-        overflow: 'hidden',
-        gap: 8,
-    },
-    customHeaderContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        alignSelf: 'center',
-        width: '100%',
-        paddingBottom: 12,
-    },
-    headerIcon: {
-        width: 32,
-        height: 32,
-        marginRight: 12,
-        resizeMode: 'contain',
-    },
-    headerText: {
-        fontSize: 20,
-        height: 32,
-        fontWeight: 'bold',
-        color: Colors["global"]?.light || '#ffffff',
-        textAlign: 'center',
-        flex: 0,
-        textShadowColor: 'rgba(0,0,0,0.12)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
-    },
+
     container: {
         width: '100%',
         height: '80%',
         bottom: 0,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
-        marginTop: -14, // Adiciona sobreposição de 14px sobre o header
+        marginTop: -16, // Adiciona sobreposição de 16px sobre o header
+        display: 'flex',
+        flexDirection: 'column',
+        paddingTop: 20,
+        gap: 16,
     },
     functionsBlock: {
         top: 24,
@@ -131,20 +91,41 @@ const styles = StyleSheet.create({
     },
     footer: {
         position: "absolute",
-        bottom: 24,
+        bottom: 6,
         left: 0,
         right: 0,
         alignItems: "center",
         backgroundColor: 'transparent',
-        zIndex: 10, // Adicionado para ficar acima do overlay
+        zIndex: 20, // Adicionado para ficar acima do overlay
+        paddingBottom: 2,
     },
     footerText: {
-        color: Colors.global.light,
+        color: Colors.global.blueDark,
         fontSize: 14,
-        marginBottom: 4,
+        marginBottom: 2,
+        marginTop: 20
     },
     footerVersion: {
-        color: Colors.global.light,
+        color: Colors.global.blueDark,
         fontSize: 12,
+        marginBottom: 0,
     },
+    controlButtons: {
+        marginTop: 12,
+        width: '100%',
+        flexDirection: 'column',
+        gap: 8,
+        alignItems: 'center'
+    },
+    smallButton: {
+        width: '90%',
+        padding: 10,
+        backgroundColor: Colors.global.blueLight,
+        borderRadius: 8,
+        alignItems: 'center'
+    },
+    smallButtonText: {
+        color: '#fff',
+        fontWeight: '700'
+    }
 });

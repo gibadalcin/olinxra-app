@@ -7,7 +7,7 @@ type CaptureSettings = {
 
 const CaptureSettingsContext = createContext<CaptureSettings | undefined>(undefined);
 
-export function CaptureSettingsProvider({ children }: { children: ReactNode }) {
+export function CaptureSettingsProvider({ children }: { children?: ReactNode }) {
     const [showOrientation, setShowOrientation] = useState(true);
     return (
         <CaptureSettingsContext.Provider value={{ showOrientation, setShowOrientation }}>

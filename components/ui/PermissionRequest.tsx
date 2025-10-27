@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Button, StyleSheet, type ImageSourcePropType } from 'react-native';
+import { View, Button, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { Image } from 'expo-image';
 import { Colors } from '@/constants/Colors';
@@ -11,6 +12,7 @@ type PermissionRequestProps = {
 // Removemos o 'export' da função
 function PermissionRequest({ onRequestPermission }: PermissionRequestProps) {
     const textColor = Colors['light'].headerText;
+    const router = useRouter();
 
     return (
         <View style={styles.container}>
@@ -20,14 +22,25 @@ function PermissionRequest({ onRequestPermission }: PermissionRequestProps) {
                 style={styles.logo}
                 contentFit='contain'
             />
-            <ThemedText style={[styles.permissionText, { color: textColor }]}>
-                Para continuar, precisamos da sua permissão para acessar a câmera e a galeria.
-            </ThemedText>
-            <Button
-                onPress={onRequestPermission}
-                title="Conceder Permissão"
-                color="#0047AB"
-            />
+            <ThemedText style={[styles.permissionText, { color: textColor }]}>Para continuar, precisamos da sua permissão para acessar:</ThemedText>
+            <View style={styles.bulletList}>
+                <ThemedText style={[styles.bulletItem, { color: textColor }]}>• Câmera</ThemedText>
+                <ThemedText style={[styles.bulletItem, { color: textColor }]}>• Galeria</ThemedText>
+                <ThemedText style={[styles.bulletItem, { color: textColor }]}>• Localização</ThemedText>
+            </View>
+            <View style={styles.buttonWrapper}>
+                <Button
+                    onPress={onRequestPermission}
+                    title="Conceder Permissão"
+                    color="#0047AB"
+                />
+            </View>
+            <View style={[styles.buttonWrapper, styles.buttonSpacing]}>
+                <Button
+                    onPress={() => router.replace('/(tabs)/help?open=permissions')}
+                    title="Negar Permissão"
+                />
+            </View>
         </View>
     );
 }
@@ -50,9 +63,24 @@ const styles = StyleSheet.create({
     permissionText: {
         fontSize: 18,
         textAlign: 'center',
-        marginBottom: 30,
+        marginBottom: 8,
         lineHeight: 26,
         paddingHorizontal: 20,
         maxWidth: '90%',
     },
+    buttonWrapper: {
+        width: '70%',
+    },
+    buttonSpacing: {
+        marginTop: 20,
+    },
+    bulletList: {
+        width: '70%',
+        alignItems: 'flex-start',
+        marginBottom: 30,
+    },
+    bulletItem: {
+        fontSize: 16,
+        marginBottom: 6,
+    }
 });

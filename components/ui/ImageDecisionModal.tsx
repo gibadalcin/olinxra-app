@@ -34,6 +34,8 @@ export function ImageDecisionModal({
     const imageWidth = width * 0.8;
     const [loading, setLoading] = useState(false);
     const [showNoContentModal, setShowNoContentModal] = useState(false);
+    const [noContentBrand, setNoContentBrand] = useState<string | null>(null);
+    const [noContentLocation, setNoContentLocation] = useState<string | null>(null);
     const canSave = !saveDisabled && imageSource === 'camera';
     const router = useRouter();
     const { fetchContentForRecognition } = useARContent();
@@ -46,10 +48,14 @@ export function ImageDecisionModal({
             if ((result.status === 'cached' || result.status === 'recognized') && 'data' in result && result.data && typeof result.data.name === 'string') {
                 // recognized -> now try fetch content by location
                 try {
-                    // request location
-                    const { status } = await Location.requestForegroundPermissionsAsync();
+                    // check location permission (do not request here; PermissionRequest handles requesting)
+                    const { status } = await Location.getForegroundPermissionsAsync();
                     if (status !== 'granted') {
-                        Alert.alert('Permissão negada', 'Preciso da sua localização para buscar conteúdo próximo');
+                        Alert.alert('Permissão necessária', 'Preciso da sua localização para buscar conteúdo próximo. Vá até a tela de captura e conceda a permissão.');
+                        setLoading(false);
+                        onCancel();
+                        router.push('/(tabs)/recognizer');
+                        return;
                     } else {
                         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
                         const lat = loc.coords.latitude;
@@ -222,7 +228,10 @@ export function ImageDecisionModal({
                             router.push('/(tabs)/ar-view');
                             shouldCancel = false;
                         } else {
-                            Alert.alert('Nenhum conteúdo próximo', 'Não foi encontrado conteúdo associado para essa localização.');
+                            // No content for recognized brand: show the no-content modal with brand and location
+                            try { setNoContentBrand(result.data.name || 'Desconhecida'); } catch (e) { setNoContentBrand('Desconhecida'); }
+                            try { setNoContentLocation(respLocalizacao || null); } catch (e) { setNoContentLocation(null); }
+                            setShowNoContentModal(true);
                         }
                     }
                 } catch (e) {
@@ -235,7 +244,22 @@ export function ImageDecisionModal({
                     ('message' in result && typeof result.message === 'string') ? result.message : 'Nenhum logo reconhecido com confiança suficiente.'
                 );
             } else if (result.status === 'not_found') {
-                setShowNoContentModal(true);
+                // Not recognized at all: try to obtain location for display and show no-content modal
+                try {
+                    const { status } = await Location.getForegroundPermissionsAsync();
+                    let locStr: string | null = null;
+                    if (status === 'granted') {
+                        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
+                        locStr = `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`;
+                    }
+                    setNoContentBrand('Desconhecida');
+                    setNoContentLocation(locStr);
+                    setShowNoContentModal(true);
+                } catch (e) {
+                    setNoContentBrand('Desconhecida');
+                    setNoContentLocation(null);
+                    setShowNoContentModal(true);
+                }
                 shouldCancel = false;
             } else if (result.status === 'error') {
                 Alert.alert('Erro', ('error' in result && typeof result.error === 'string') ? result.error : 'Falha na comunicação com o servidor.');
@@ -266,8 +290,8 @@ export function ImageDecisionModal({
     return (
         <>
             {loading && <LoadingCaptureModal visible={loading} />}
-            {showNoContentModal && <NoContentToDisplayModal visible={showNoContentModal} onCancel={handleNoContentCancel} />}
-            <Modal visible={visible} transparent>
+            {showNoContentModal && <NoContentToDisplayModal visible={showNoContentModal} onCancel={handleNoContentCancel} brand={noContentBrand} location={noContentLocation} />}
+            <Modal visible={visible} transparent={false} animationType="slide" statusBarTranslucent={true}>
                 <View style={styles.overlay}>
                     <Image source={{ uri: imageUri }} style={{ width: imageWidth, height: imageWidth / 1.25, borderRadius: 12 }} />
                     <View style={styles.buttonContainer}>

@@ -1,10 +1,15 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, Linking, Alert, Platform, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Linking, Alert, Platform, AppState, AppStateStatus, Pressable } from 'react-native';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { API_CONFIG } from '../../config/api';
-import { WebView } from 'react-native-webview';
-import { consumeLastARContent } from '@/utils/lastARContent';
+import { auth } from '../../firebaseConfig';
+import { ARLauncher } from '@/components/ar';
+import { consumeLastARContent, setRestartCaptureOnReturn } from '@/utils/lastARContent';
+import useARSupport from '@/hooks/useARSupport';
+import CustomHeader from '@/components/CustomHeader';
 
-const { height: screenHeight } = Dimensions.get('window');
+
 
 // Definição das mensagens de estado da UI
 const UIMessages = {
@@ -19,7 +24,12 @@ export default function ARViewScreen() {
     const [payload, setPayload] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
     const [statusMessage, setStatusMessage] = useState(UIMessages.INITIAL);
-    const webRef = useRef<WebView | null>(null);
+    const launchedRef = useRef(false);
+    const launchedForContentRef = useRef(false);
+    const actionInProgressRef = useRef(false);
+    // evitar re-requests de fallback repetidos (marca nomes de arquivo já tentados)
+
+    // NOTE: removed preview/transform variant handling — we open payload model or generate via backend when requested.
 
     // Função auxiliar para buscar a URL do modelo GLB no payload (mantida)
     const findModelUrl = useCallback((obj: any): string | null => {
@@ -83,38 +93,53 @@ export default function ARViewScreen() {
     }, []);
 
     // --- VARIÁVEL CHAVE: URL do Modelo Final (Totem ou Astronauta) ---
+    // Nota: removido o fluxo automático que buscava um "default" signed URL
+    // pelo nome (DEFAULT_MODEL_FILENAME) para evitar referências e lógica
+    // residual. Agora a URL final é tomada exclusivamente do payload quando
+    // presente; caso contrário usamos um fallback público (Astronaut).
+
+    // Final model URL is taken only from payload. If no model is present the
+    // UI will inform the user instead of attempting any demo/fallback model.
     const finalModelUrl: string | null = useMemo(() => {
-        const payloadUrl = findModelUrl(payload);
-        if (payloadUrl) return payloadUrl;
-        return 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
+        return findModelUrl(payload);
     }, [payload, findModelUrl]);
+
+    // Log the final model URL for debugging
+    useEffect(() => {
+        try {
+            console.log('[ARView] finalModelUrl:', finalModelUrl);
+        } catch (e) { }
+    }, [finalModelUrl]);
+
+    // Read AR support from shared hook (uses cached probe run at app start).
+    const supportsAR = useARSupport();
+
+    // Removed preview diagnostics and URL normalization — not needed for native AR path.
+
+
 
     const openNativeARWithModel = useCallback(async (modelUrl?: string | null) => {
         if (!modelUrl) return false;
 
-        setStatusMessage(UIMessages.LAUNCHING); // Atualiza o status
+        setStatusMessage(UIMessages.LAUNCHING);
 
         const sceneViewerUrl = `https://arvr.google.com/scene-viewer/1.2?file=${encodeURIComponent(modelUrl)}&mode=ar_preferred`;
 
         let launched = false;
-
-        // 1. Scene Viewer (HTTPS)
         try { if (await Linking.canOpenURL(sceneViewerUrl)) { await Linking.openURL(sceneViewerUrl); launched = true; } } catch (e) { console.debug("Scene Viewer via HTTPS falhou:", e); }
 
-        // 2. Quick Look / Raw URL (iOS)
         if (!launched && Platform.OS === 'ios') { try { await Linking.openURL(modelUrl); launched = true; } catch (e) { console.debug("Quick Look falhou:", e); } }
 
-        // 3. Intent URI (Android)
         if (!launched && Platform.OS === 'android') {
             const intentUrl = `intent://arvr.google.com/scene-viewer/1.2?file=${encodeURIComponent(modelUrl)}&mode=ar_preferred#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;end`;
             try { await Linking.openURL(intentUrl); launched = true; } catch (e) { console.debug("Intent URI falhou:", e); }
         }
 
         if (!launched) {
-            setStatusMessage(UIMessages.ERROR); // AR Nativo Falhou
+            setStatusMessage(UIMessages.ERROR);
             Alert.alert('AR Indisponível', UIMessages.ERROR);
         } else {
-            setStatusMessage(UIMessages.READY); // Volta para o estado "pronto" após o lançamento
+            setStatusMessage(UIMessages.READY);
         }
         return launched;
     }, []);
@@ -129,111 +154,64 @@ export default function ARViewScreen() {
         }
     }, [loading, finalModelUrl]);
 
-    // Payload para injeção (mantido)
-    const embeddedPayloadForHtml = useMemo(() => {
-        try {
-            if (!payload) return 'null';
-            return JSON.stringify({ type: 'payload', payload }).replace(/</g, '\\u003c');
-        } catch (e) { return 'null'; }
-    }, [payload]);
+    // No remote fallback models: we only use payload-provided models. If
+    // there's no model, UI will show an informational message and not offer
+    // an AR button.
+    // Auto-launch effect: quando tivermos uma URL final e não estivermos já lançando, abra o AR nativo.
+    // Deve estar acima dos retornos condicionais para não alterar a ordem de Hooks entre renders.
+    const router = useRouter();
 
-    // --- Geração do HTML (AGORA COM HOTSPOT ANCORADO) ---
-    const html = useMemo(() => {
-        const modelUrl = finalModelUrl || 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
-        const poster = (payload && payload.previewImage && typeof payload.previewImage === 'string' && payload.previewImage.length < 150000) ? payload.previewImage : '';
-
-        // Extração de Marca
-        const nomeMarca = String((payload && payload.anchorData && payload.anchorData.titulo) || (payload && payload.nome_marca) || 'Marca Padrão');
-
-        // Extração de localização com prioridade:
-        // 1) se houver `nome_regiao` armazenado no conteúdo, usá-lo;
-        // 2) se houver `tipo_regiao` e `endereco` (objeto do geocode), mapear para o campo apropriado (rua/bairro/cidade/estado/pais);
-        // 3) fallback para `localizacao` (string construída) ou outras chaves encontradas recursivamente.
-        const nomeRegiaoField = payload && (payload.nome_regiao || payload.nomeRegiao || payload['nome_região']) ? (payload.nome_regiao || payload.nomeRegiao || payload['nome_região']) : null;
-        const tipoRegiaoField = payload && (payload.tipo_regiao || payload.tipoRegiao) ? (payload.tipo_regiao || payload.tipoRegiao) : null;
-        const enderecoObj = payload && payload.endereco ? payload.endereco : null;
-
-        let chosenLocation: string | null = null;
-        if (nomeRegiaoField && String(nomeRegiaoField).trim() !== '') {
-            chosenLocation = String(nomeRegiaoField).trim();
-        } else if (tipoRegiaoField && enderecoObj && typeof enderecoObj === 'object') {
-            const t = String(tipoRegiaoField).toLowerCase();
-            // Mapear tipos comuns para chaves do Nominatim
-            if (t.includes('rua') || t.includes('logradouro') || t.includes('address') || t.includes('street')) {
-                chosenLocation = enderecoObj.road || enderecoObj.pedestrian || enderecoObj.footway || null;
-            } else if (t.includes('bairro') || t.includes('neighbourhood') || t.includes('suburb')) {
-                chosenLocation = enderecoObj.suburb || enderecoObj.neighbourhood || enderecoObj.hamlet || null;
-            } else if (t.includes('cidade') || t.includes('town') || t.includes('village') || t.includes('city')) {
-                chosenLocation = enderecoObj.city || enderecoObj.town || enderecoObj.village || null;
-            } else if (t.includes('estado') || t.includes('state') || t.includes('province')) {
-                chosenLocation = enderecoObj.state || null;
-            } else if (t.includes('pais') || t.includes('country')) {
-                chosenLocation = enderecoObj.country || null;
-            }
-            if (chosenLocation) chosenLocation = String(chosenLocation).trim();
-        }
-
-        // último recurso: procurar por chaves textuais no payload (nome_regiao, localizacao, address, city...)
-        const locationKeys = ['nome_regiao', 'nome_região', 'nomeRegiao', 'localizacao', 'endereco', 'address', 'road', 'suburb', 'city', 'state', 'country'];
-        const extractedLocation = findStringValue(payload, locationKeys);
-        const localizacao = String(chosenLocation || extractedLocation || 'Localização Padrão');
-        const tituloCompleto = `${nomeMarca} | ${localizacao}`;
-
-        const bgStyle = 'background:black;'; // Fundo preto
-
-        // HOTSPOT: marca + localização (não clicável)
-        const hotspotHtml = `
-            <div 
-                slot="hotspot-marca" 
-                data-position="0 1.8 0.5" 
-                data-normal="0 0 1"
-                style="color:white; font-size:16px; font-weight:bold; background:rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 5px; transform: translate(0, -100%); pointer-events: none;">
-                ${tituloCompleto}
-            </div>`;
-
-        return `
-            <!doctype html>
-            <html>
-            <head>
-                <meta name="viewport" content="width=device-width,initial-scale=1" />
-                <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-                <style>
-                    html,body{height:100%;margin:0;${bgStyle}}
-                    #mv{width:100%;height:100vh;position:fixed;top:0;left:0;z-index:1000; background: black;}
-                    [slot^="hotspot-"] { z-index: 1000; }
-                </style>
-            </head>
-            <body>
-                <model-viewer
-                    id="mv"
-                    src="${modelUrl}"
-                    poster="${poster}"
-                    alt="Modelo 3D"
-                    camera-controls
-                    shadow-intensity="1"
-                    style="width: 100%; height: 100vh;"
-                >
-                    ${hotspotHtml}
-                </model-viewer>
-            </body>
-            </html>
-        `;
-    }, [payload, findModelUrl, finalModelUrl]);
-
-    // Envio de Payload (mantido)
+    // Auto-launch AR only when payload includes a model
     useEffect(() => {
-        const send = () => {
+        if (loading) return;
+        if (!finalModelUrl) return;
+        if (launchedRef.current) return;
+        launchedRef.current = true;
+        launchedForContentRef.current = true;
+
+        (async () => {
             try {
-                if (webRef.current && payload) {
-                    webRef.current.injectJavaScript && webRef.current.injectJavaScript(`(function(){window.__RN_MESSAGE__ = ${embeddedPayloadForHtml};})();true;`);
+                const ok = await openNativeARWithModel(finalModelUrl);
+                if (!ok) {
+                    launchedRef.current = false;
+                    launchedForContentRef.current = false;
                 }
-            } catch (e) { }
+            } catch (e) {
+                console.warn('[ARView] auto-launch failed', e);
+                launchedRef.current = false;
+                launchedForContentRef.current = false;
+            }
+        })();
+    }, [loading, finalModelUrl, openNativeARWithModel]);
+
+    // If there is no model associated with this AR view, mark that when the
+    // user navigates back to the capture tab we should restart the capture
+    // flow (open modal or let them pick another image). This flag will be
+    // consumed by the capture screen when it gains focus.
+    useEffect(() => {
+        try {
+            if (!finalModelUrl) {
+                setRestartCaptureOnReturn(true);
+            } else {
+                setRestartCaptureOnReturn(false);
+            }
+        } catch (e) { }
+    }, [finalModelUrl]);
+
+    // When the app returns to foreground after launching AR for content,
+    // close this flow and return to previous screen (capture).
+    useEffect(() => {
+        const onAppStateChange = (nextState: AppStateStatus) => {
+            if (nextState === 'active' && launchedForContentRef.current) {
+                // reset flags and navigate back to capture screen
+                launchedForContentRef.current = false;
+                launchedRef.current = false;
+                try { router.back(); } catch (e) { console.warn('Failed to navigate back after AR close', e); }
+            }
         };
-        send();
-        const t1 = setTimeout(send, 300);
-        const t2 = setTimeout(send, 900);
-        return () => { try { clearTimeout(t1); clearTimeout(t2); } catch (e) { } };
-    }, [payload, embeddedPayloadForHtml]);
+        const sub = AppState.addEventListener ? AppState.addEventListener('change', onAppStateChange) : null;
+        return () => { if (sub && sub.remove) sub.remove(); };
+    }, [router]);
 
     // Hotspot/message handling removed — não usamos mais hotspots clicáveis
 
@@ -281,22 +259,16 @@ export default function ARViewScreen() {
     }, []);
 
     const handleVerEmRA = useCallback(async () => {
-        // quick debug: quem está no payload agora?
-        try {
-            const blocks = (payload && (payload.blocos || payload.conteudo)) || [];
-            const blocksCount = Array.isArray(blocks) ? blocks.length : 0;
-            const payloadKeys = payload ? Object.keys(payload).slice(0, 10).join(',') : 'nenhum';
-            const payloadModel = findModelUrl(payload);
-            const imageCandidate = findFirstImageUrl(payload);
-            console.log('[AR DEBUG] payloadKeys:', payloadKeys, 'blocksCount:', blocksCount);
-            console.log('[AR DEBUG] modelCandidate:', payloadModel, 'imageCandidate:', imageCandidate);
-            try { Alert.alert('AR Debug', `model: ${payloadModel || 'nulo'}\nimage: ${safePreview(imageCandidate)}\nblocks: ${blocksCount}`); } catch (e) { }
-        } catch (e) { console.warn('[AR DEBUG] erro ao inspecionar payload', e); }
+        // Prevent duplicate activations
+        if (actionInProgressRef.current) return;
+        actionInProgressRef.current = true;
 
         // 1) se o payload já traz um modelo (.glb) use-o
         const payloadModel = findModelUrl(payload);
         if (payloadModel) {
-            openNativeARWithModel(payloadModel);
+            launchedForContentRef.current = true;
+            await openNativeARWithModel(payloadModel);
+            actionInProgressRef.current = false;
             return;
         }
 
@@ -323,9 +295,11 @@ export default function ARViewScreen() {
                 try { Alert.alert('AR Debug', 'Usando preview embutido (base64) como imagem para gerar GLB.'); } catch (e) { }
                 // continua o fluxo enviando imageUrl (data:) para o backend
             } else {
-                Alert.alert('Conteúdo não disponível', 'Nenhuma mídia encontrada para abrir em AR.');
-                // fallback para astronauta
-                openNativeARWithModel(finalModelUrl);
+                // No content to generate a GLB from — inform the user and do not
+                // show or attempt to open AR. The UI already hides the button in
+                // this case, but we keep this guard for manual invocations.
+                try { Alert.alert('Conteúdo não disponível', 'Nenhuma mídia encontrada para abrir em RA.'); } catch (e) { }
+                actionInProgressRef.current = false;
                 return;
             }
         }
@@ -333,18 +307,32 @@ export default function ARViewScreen() {
         try {
             setStatusMessage('Gerando modelo AR...');
 
-            // Mostra alert visível com a imageUrl para garantir feedback no dispositivo
-            try {
-                Alert.alert('AR Debug', `Enviando image_url: ${safePreview(imageUrl)}`);
-            } catch (e) { /* não bloquear se Alert falhar */ }
-
             // Debug: qual URL estamos enviando para o backend (Metro)
             console.log('[AR] Gerar GLB para image_url:', safePreview(imageUrl));
 
+            // Do not send a transient filename (e.g. with Date.now()) to the backend.
+            // The backend generates a stable filename based on the SHA256 of the image_url
+            // so we should omit `filename` here to allow cache hits (avoid duplicate GLBs).
+            // include owner_uid when available so backend can place the GLB under the proper prefix
+            const ownerUid = payload && (payload.owner_uid || payload.ownerUid || payload.owner || null);
+            const bodyObj: any = { image_url: imageUrl };
+            if (ownerUid) bodyObj.owner_uid = ownerUid;
+
+            // attach idToken if available (anonymous auth) so backend can validate requests when enabled
+            const headers: any = { 'Content-Type': 'application/json' };
+            try {
+                if (auth && auth.currentUser) {
+                    const idToken = await auth.currentUser.getIdToken();
+                    if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+                }
+            } catch (_e) {
+                // ignore token errors silently
+            }
+
             const res = await fetch(`${API_CONFIG.BASE_URL}/api/generate-glb-from-image`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image_url: imageUrl, filename: `conteudo_${Date.now()}.glb` })
+                headers,
+                body: JSON.stringify(bodyObj)
             });
 
             // Log do status e do corpo (text) para diagnóstico
@@ -366,20 +354,20 @@ export default function ARViewScreen() {
             const glbUrl = j && (j.glb_signed_url || j.glb_url || j.glbSignedUrl);
             if (glbUrl) {
                 console.log('[AR] GLB gerado:', glbUrl);
-                try { Alert.alert('GLB Gerado', `${glbUrl}`); } catch (e) { }
-                openNativeARWithModel(glbUrl);
+                launchedForContentRef.current = true;
+                await openNativeARWithModel(glbUrl);
+                actionInProgressRef.current = false;
                 return;
             }
 
             console.warn('[AR] generate-glb-from-image: sem glb na resposta', j || respText);
-            try { Alert.alert('Erro', `Resposta inválida do servidor.\n${(respText || '').substring(0, 200)}`); } catch (e) { }
-            openNativeARWithModel(finalModelUrl);
+            try { Alert.alert('Erro', 'Não foi possível gerar o modelo AR.'); } catch (e) { }
         } catch (e) {
             console.warn('Erro gerando GLB:', e);
-            try { Alert.alert('Erro', 'Não foi possível gerar o modelo AR. Abrindo fallback.'); } catch (e) { }
-            openNativeARWithModel(finalModelUrl);
+            try { Alert.alert('Erro', 'Não foi possível gerar o modelo AR.'); } catch (e) { }
         } finally {
             setStatusMessage(UIMessages.READY);
+            actionInProgressRef.current = false;
         }
     }, [payload, finalModelUrl, findModelUrl, findFirstImageUrl, openNativeARWithModel]);
 
@@ -388,66 +376,71 @@ export default function ARViewScreen() {
     // Estado 1: Carregamento Inicial
     if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#0000ff" /><Text style={styles.launchText}>Buscando conteúdo...</Text></View>;
 
-    // Estado 2: Payload Ausente / Modelo não encontrado
-    if (!payload || !finalModelUrl) {
-        return <View style={styles.center}><Text style={styles.launchText}>Nenhum modelo 3D associado para AR.</Text></View>;
-    }
-
-    // Estado 3: Renderização do WebView + Overlays Nativos
-    const isReady = statusMessage !== UIMessages.INITIAL && statusMessage !== UIMessages.LAUNCHING;
+    // Estado 2+: Render overlay. If there's no model, show informational text
+    // and hide the 'Ver em RA' button. If there is a model, button is shown
+    // and auto-launch happens as implemented above.
+    const isReady = Boolean(finalModelUrl) && statusMessage !== UIMessages.INITIAL && statusMessage !== UIMessages.LAUNCHING;
 
     return (
-        <View style={styles.fullScreenContainer}>
-            {/* 1. WebView com o Modelo 3D (ONDE O TÍTULO ESTÁ ANCORADO) */}
-            <View style={{ flex: 1, height: screenHeight, position: 'absolute', top: 0, left: 0, right: 0 }}>
-                <WebView
-                    ref={webRef}
-                    originWhitelist={["*"]}
-                    source={{ html }}
-                    javaScriptEnabled={true}
-                    domStorageEnabled={true}
-                    style={{ flex: 1, backgroundColor: 'transparent' }}
-                />
-            </View>
+        <>
+            <CustomHeader title="Visualizar em AR" />
 
+            <View style={styles.fullScreenContainer}>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    {/* When there's no model, show a centered adaptive icon above the message */}
+                    {!finalModelUrl && (
+                        <Image
+                            source={require('../../assets/images/adaptive-icon-w.png')}
+                            style={{ width: 120, height: 120, marginBottom: 12 }}
+                            contentFit="contain"
+                        />
+                    )}
 
-            {/* 2. OVERLAYS NATIVOS (Mensagem e Botão de Ação) */}
-            <View style={styles.overlayNative}>
-                {/* Mensagem de Status */}
-                <Text style={styles.launchText}>{statusMessage}</Text>
+                    <Text style={{ color: 'white', fontSize: 16, marginBottom: 8 }}>{finalModelUrl ? statusMessage : 'Nenhum modelo 3D associado para RA.'}</Text>
 
-                {/* BOTÃO "VER EM RA" (Posição Fixa) */}
-                <View style={styles.bottomBar}>
-                    <TouchableOpacity
-                        style={[styles.mainActionButton, !isReady && { opacity: 0.5 }]}
-                        onPress={() => isReady && handleVerEmRA()}
-                        disabled={!isReady}
-                    >
-                        <Text style={styles.mainActionText}>VER EM RA</Text>
-                    </TouchableOpacity>
+                    {!finalModelUrl ? (
+                        <>
+                            <Text style={{ width: '80%', color: '#bbb', fontSize: 13, marginBottom: 12 }}>{'Não há conteúdo disponível para visualização em RA neste item.'}</Text>
+                            {/* Button to allow accessing backend content when device does NOT support AR. Visible only when supportsAR is explicitly false. No navigation/action yet. */}
+                        </>
+                    ) : (
+                        <Text style={{ color: '#bbb', fontSize: 13, marginBottom: 20 }}>{'Abrindo AR nativo — se nada acontecer, toque em "Ver em RA".'}</Text>
+                    )}
+
+                    {supportsAR === false && (
+                        <Pressable style={[styles.mainActionButton, { paddingHorizontal: 20, paddingVertical: 12, marginTop: 20 }]} onPress={() => { /* intentional no-op for now */ }}>
+                            <Text style={styles.mainActionText}>Acessar conteúdo (sem RA)</Text>
+                        </Pressable>
+                    )}
                 </View>
-
+                <ARLauncher isReady={isReady} statusMessage={statusMessage} onLaunch={handleVerEmRA} styles={styles} showButton={Boolean(finalModelUrl)} />
             </View>
-        </View>
+        </>
     );
 }
 
 const styles = StyleSheet.create({
     center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'black' },
-    fullScreenContainer: { flex: 1, backgroundColor: 'black' },
+    fullScreenContainer: {
+        flex: 1,
+        backgroundColor: 'black',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        marginTop: -18, // Adiciona sobreposição de 14px sobre o header
+        justifyContent: 'center',
+    },
     launchText: { color: 'white', marginTop: 10 },
     bottomBar: {
         position: 'absolute',
         bottom: 50,
         zIndex: 10,
         width: '100%',
-        alignItems: 'center',
     },
     mainActionButton: {
         backgroundColor: '#3498db',
         paddingHorizontal: 30,
         paddingVertical: 15,
-        borderRadius: 30,
+        borderRadius: 8,
     },
     mainActionText: {
         color: 'white',

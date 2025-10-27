@@ -33,7 +33,7 @@ export function LoadingCaptureModal({ visible, onFinish, onCancel, result, minDu
 
     if (result?.status === 'error') {
         return (
-            <Modal visible transparent animationType="fade">
+            <Modal visible transparent statusBarTranslucent animationType="fade">
                 <View style={styles.overlay}>
                     <Text style={{ color: Colors.global.dark, marginBottom: 16 }}>Ocorreu um erro ao processar a imagem.</Text>
                     <Button title="Cancelar" onPress={onCancel} color={Colors.global.blueDark} />
@@ -43,7 +43,7 @@ export function LoadingCaptureModal({ visible, onFinish, onCancel, result, minDu
     }
 
     return (
-        <Modal visible={show} transparent animationType="fade">
+        <Modal visible={show} transparent statusBarTranslucent animationType="fade">
             <View style={styles.overlay}>
                 <ActivityIndicator size="large" color={Colors.global.blueLight} />
             </View>
@@ -53,7 +53,11 @@ export function LoadingCaptureModal({ visible, onFinish, onCancel, result, minDu
 
 const styles = StyleSheet.create({
     overlay: {
-        flex: 1,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         backgroundColor: 'rgba(0,0,0,0.35)',
         justifyContent: 'center',
         alignItems: 'center',
