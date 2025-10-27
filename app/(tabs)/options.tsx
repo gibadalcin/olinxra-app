@@ -2,7 +2,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { useCaptureSettings } from '@/context/CaptureSettingsContext';
-import { Switch, StyleSheet, Alert, Platform, BackHandler, TouchableOpacity } from 'react-native';
+import { Switch, StyleSheet } from 'react-native';
 import CustomHeader from '@/components/CustomHeader';
 
 const headerTitle = "Opções de configuração";
