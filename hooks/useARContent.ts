@@ -48,6 +48,24 @@ export function useARContent() {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  async function fetchSmartContent(nome_marca: string, lat: number, lon: number) {
+    try {
+      const base = API_CONFIG.BASE_URL || '';
+      const body = { nome_marca, latitude: lat, longitude: lon };
+      const res = await fetch(`${base}/api/smart-content`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) return null;
+      const j = await res.json();
+      return j; // return full response (contains conteudo + tipo_regiao + nome_regiao)
+    } catch (e) {
+      console.warn('smart-content error', e);
+      return null;
+    }
+  }
+
   async function fetchConsultaHelper(nome_marca: string, lat: number, lon: number, radius?: number) {
     try {
       const base = API_CONFIG.BASE_URL || '';
@@ -138,7 +156,22 @@ export function useARContent() {
 
       const radii = options.radii || DEFAULT_RADII;
 
-      // 1) Try consulta helper first (fast path)
+      // 🚀 1) TRY SMART CONTENT FIRST (PARALELO - SUPER RÁPIDO!)
+      updateStage('Buscando conteúdo...');
+      const smartStart = performance.now();
+      const smartResult = await fetchSmartContent(nome_marca, lat, lon);
+      console.log(`[useARContent] ⚡ Smart content: ${((performance.now() - smartStart) / 1000).toFixed(2)}s`);
+
+      if (smartResult && smartResult.conteudo) {
+        await saveCachedContent(nome_marca, lat, lon, smartResult);
+        console.log(`[useARContent] ⏱️ Total: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
+        setConteudo(smartResult.conteudo);
+        setLoadingStage('');
+        setLoading(false);
+        return smartResult;
+      }
+
+      // 2) FALLBACK: Try consulta helper (caso smart-content falhe)
       updateStage('Buscando conteúdo próximo...');
       const consultaStart = performance.now();
       const consulta = await fetchConsultaHelper(nome_marca, lat, lon, options.initialRadius);
@@ -153,7 +186,7 @@ export function useARContent() {
         return consulta; // return full response so caller can access localizacao/nome_regiao
       }
 
-      // 2) progressive widening using radii or radius_m from admin
+      // 3) FALLBACK: progressive widening using radii (caso consulta também falhe)
       for (let r of radii) {
         updateStage(`Expandindo busca (raio ${r}m)...`);
         const radiusStart = performance.now();
@@ -170,7 +203,7 @@ export function useARContent() {
         }
       }
 
-      // 3) try region-level fallbacks using reverse geocode from device
+      // 4) FALLBACK: try region-level fallbacks using reverse geocode from device
       updateStage('Buscando por região...');
       const geocodeStart = performance.now();
       try {
