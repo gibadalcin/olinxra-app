@@ -43,6 +43,11 @@ export default function LoadingWithTips({ visible, stage }: LoadingWithTipsProps
     const [currentTipIndex, setCurrentTipIndex] = useState(0);
     const [fadeAnim] = useState(new Animated.Value(1));
 
+    // 🐛 DEBUG: Log quando visible/stage mudar
+    useEffect(() => {
+        console.log('[LoadingWithTips] visible:', visible, 'stage:', stage);
+    }, [visible, stage]);
+
     useEffect(() => {
         if (!visible) return;
 

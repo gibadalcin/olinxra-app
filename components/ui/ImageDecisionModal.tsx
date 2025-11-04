@@ -332,7 +332,6 @@ export function ImageDecisionModal({
 
     return (
         <>
-            <LoadingWithTips visible={loading} stage={loadingStage || loadingMessage} />
             {showNoContentModal && <NoContentToDisplayModal visible={showNoContentModal} onCancel={handleNoContentCancel} brand={noContentBrand} location={noContentLocation} />}
             <Modal visible={visible} transparent={false} animationType="slide" statusBarTranslucent={true}>
                 <View style={styles.overlay}>
@@ -355,6 +354,8 @@ export function ImageDecisionModal({
                             <Text style={styles.buttonText}>Cancelar</Text>
                         </Pressable>
                     </View>
+                    {/* ✅ Loader renderizado DENTRO do Modal para aparecer sobre os botões */}
+                    <LoadingWithTips visible={loading} stage={loadingStage || loadingMessage} />
                 </View>
             </Modal>
         </>

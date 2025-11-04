@@ -1,11 +1,45 @@
 import { useState, useRef } from 'react';
 import { API_CONFIG } from '../config/api';
 import { getCachedContent, saveCachedContent, cleanExpiredCache } from '../utils/contentCache';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Contract: fetchContentForRecognition(nome_marca, lat, lon, options)
 // options: { initialRadius?: number, radii?: number[], preferConsultaHelper?: boolean }
 
 export type ARBlock = any;
+
+/**
+ * Verifica se o cache contém GLBs com glb_signed_url null
+ * Retorna true se encontrar GLBs inválidos que precisam ser atualizados
+ */
+function checkForInvalidGlbSignedUrls(cachedData: any): boolean {
+  try {
+    const blocos = cachedData?.conteudo?.blocos || cachedData?.blocos || [];
+
+    for (const bloco of blocos) {
+      // Verificar GLB direto no bloco
+      if (bloco.glb_url && bloco.glb_signed_url === null) {
+        console.log('[useARContent] 🔍 GLB inválido encontrado no bloco:', bloco.tipo);
+        return true;
+      }
+
+      // Verificar GLBs em items de carousel
+      if (bloco.items && Array.isArray(bloco.items)) {
+        for (const item of bloco.items) {
+          if (item.glb_url && item.glb_signed_url === null) {
+            console.log('[useARContent] 🔍 GLB inválido encontrado no carousel item:', item.nome);
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.warn('[useARContent] Erro ao validar GLBs:', error);
+    return false; // Em caso de erro, assume que cache está ok
+  }
+}
 
 export function useARContent() {
   const [loading, setLoading] = useState(false);
@@ -63,7 +97,11 @@ export function useARContent() {
   async function fetchContentForRecognition(nome_marca: string, lat: number, lon: number, options: any = {}) {
     setError(null);
     setLoading(true);
-    setLoadingStage('Verificando cache local...');
+    const updateStage = (stage: string) => {
+      console.log('[useARContent] 📍 Stage:', stage);
+      setLoadingStage(stage);
+    };
+    updateStage('Verificando cache local...');
     setConteudo(null);
     const abort = new AbortController();
     abortRef.current = abort;
@@ -75,11 +113,21 @@ export function useARContent() {
       // 0) Verificar cache primeiro (super rápido)
       const cachedResult = await getCachedContent(nome_marca, lat, lon);
       if (cachedResult) {
-        console.log('[useARContent] ✅ Usando cache');
-        setConteudo(cachedResult.conteudo || cachedResult);
-        setLoadingStage('');
-        setLoading(false);
-        return cachedResult;
+        // ✅ VALIDAÇÃO: Verificar se cache tem GLBs com signed URLs null
+        const hasInvalidGlbs = checkForInvalidGlbSignedUrls(cachedResult);
+
+        if (hasInvalidGlbs) {
+          console.warn('[useARContent] ⚠️ Cache tem GLBs sem signed_url, forçando atualização...');
+          // Invalidar cache e buscar novamente
+          const key = `@ar_content_cache_${nome_marca}_${Math.round(lat * 100) / 100}_${Math.round(lon * 100) / 100}`;
+          await AsyncStorage.removeItem(key).catch(() => { });
+        } else {
+          console.log('[useARContent] ✅ Usando cache');
+          setConteudo(cachedResult.conteudo || cachedResult);
+          setLoadingStage('');
+          setLoading(false);
+          return cachedResult;
+        }
       }
 
       const radii = options.radii || DEFAULT_RADII;
