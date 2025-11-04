@@ -2,14 +2,53 @@ import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { useCaptureSettings } from '@/context/CaptureSettingsContext';
-import { Switch, StyleSheet } from 'react-native';
+import { Switch, StyleSheet, Pressable, Alert } from 'react-native';
 import CustomHeader from '@/components/CustomHeader';
+import { clearAllCache } from '@/utils/contentCache';
+import { useState } from 'react';
 
 const headerTitle = "Opções de configuração";
 
 export default function Options() {
 
     const { showOrientation, setShowOrientation } = useCaptureSettings();
+    const [isClearing, setIsClearing] = useState(false);
+
+    const handleClearCache = async () => {
+        try {
+            Alert.alert(
+                'Limpar Cache',
+                'Isso irá remover todos os conteúdos em cache. Na próxima captura, os dados serão baixados novamente do servidor.\n\nDeseja continuar?',
+                [
+                    {
+                        text: 'Cancelar',
+                        style: 'cancel'
+                    },
+                    {
+                        text: 'Limpar',
+                        style: 'destructive',
+                        onPress: async () => {
+                            setIsClearing(true);
+                            try {
+                                await clearAllCache();
+                                Alert.alert(
+                                    '✅ Cache Limpo',
+                                    'Cache removido com sucesso!\n\nNa próxima captura de logo, os dados serão baixados novamente.'
+                                );
+                            } catch (error) {
+                                Alert.alert('Erro', 'Não foi possível limpar o cache.');
+                            } finally {
+                                setIsClearing(false);
+                            }
+                        }
+                    }
+                ]
+            );
+        } catch (error) {
+            console.error('[Options] Erro ao limpar cache:', error);
+        }
+    };
+
     // options no longer persist or control permission flags.
     return (
         <ThemedView style={{ flex: 1 }}>
@@ -33,6 +72,27 @@ export default function Options() {
                         />
                     </ThemedView>
                 </ThemedView>
+
+                {/* Bloco de desenvolvedor - apenas em modo DEV */}
+                {__DEV__ && (
+                    <ThemedView style={styles.functionsBlock}>
+                        <ThemedText style={styles.functionsTitle}>
+                            🛠️ Ferramentas de Desenvolvedor
+                        </ThemedText>
+                        <ThemedText style={styles.devDescription}>
+                            Limpe o cache para forçar download de dados atualizados do servidor
+                        </ThemedText>
+                        <Pressable
+                            style={[styles.clearCacheButton, isClearing && styles.clearCacheButtonDisabled]}
+                            onPress={handleClearCache}
+                            disabled={isClearing}
+                        >
+                            <ThemedText style={styles.clearCacheButtonText}>
+                                {isClearing ? '⏳ Limpando...' : '🗑️ Limpar Cache de Conteúdo'}
+                            </ThemedText>
+                        </Pressable>
+                    </ThemedView>
+                )}
 
                 <ThemedView style={styles.footer}>
                     <ThemedText style={styles.footerText}>
@@ -88,6 +148,29 @@ const styles = StyleSheet.create({
     switchLabel: {
         fontSize: 14,
         color: Colors.global.blueDark,
+    },
+    devDescription: {
+        fontSize: 12,
+        color: Colors.global.blueDark + 'AA',
+        marginBottom: 12,
+        textAlign: 'center',
+        paddingHorizontal: 8,
+    },
+    clearCacheButton: {
+        width: '100%',
+        padding: 12,
+        backgroundColor: Colors.global.blueLight,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    clearCacheButtonDisabled: {
+        opacity: 0.5,
+    },
+    clearCacheButtonText: {
+        color: '#fff',
+        fontWeight: '700',
+        fontSize: 14,
     },
     footer: {
         position: "absolute",
