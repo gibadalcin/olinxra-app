@@ -95,10 +95,12 @@ export function useARContent() {
   const DEFAULT_RADII = [50, 200, 1000, 5000];
 
   async function fetchContentForRecognition(nome_marca: string, lat: number, lon: number, options: any = {}) {
+    const startTime = performance.now();
     setError(null);
     setLoading(true);
     const updateStage = (stage: string) => {
-      console.log('[useARContent] 📍 Stage:', stage);
+      const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+      console.log(`[useARContent] 📍 Stage [${elapsed}s]:`, stage);
       setLoadingStage(stage);
     };
     updateStage('Verificando cache local...');
@@ -111,7 +113,10 @@ export function useARContent() {
 
     try {
       // 0) Verificar cache primeiro (super rápido)
+      const cacheStart = performance.now();
       const cachedResult = await getCachedContent(nome_marca, lat, lon);
+      console.log(`[useARContent] ⏱️ Cache check: ${((performance.now() - cacheStart) / 1000).toFixed(2)}s`);
+
       if (cachedResult) {
         // ✅ VALIDAÇÃO: Verificar se cache tem GLBs com signed URLs null
         const hasInvalidGlbs = checkForInvalidGlbSignedUrls(cachedResult);
@@ -123,6 +128,7 @@ export function useARContent() {
           await AsyncStorage.removeItem(key).catch(() => { });
         } else {
           console.log('[useARContent] ✅ Usando cache');
+          console.log(`[useARContent] ⏱️ Total: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
           setConteudo(cachedResult.conteudo || cachedResult);
           setLoadingStage('');
           setLoading(false);
@@ -133,10 +139,14 @@ export function useARContent() {
       const radii = options.radii || DEFAULT_RADII;
 
       // 1) Try consulta helper first (fast path)
-      setLoadingStage('Buscando conteúdo próximo...');
+      updateStage('Buscando conteúdo próximo...');
+      const consultaStart = performance.now();
       const consulta = await fetchConsultaHelper(nome_marca, lat, lon, options.initialRadius);
+      console.log(`[useARContent] ⏱️ Consulta helper: ${((performance.now() - consultaStart) / 1000).toFixed(2)}s`);
+
       if (consulta && consulta.conteudo) {
         await saveCachedContent(nome_marca, lat, lon, consulta);
+        console.log(`[useARContent] ⏱️ Total: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
         setConteudo(consulta.conteudo);
         setLoadingStage('');
         setLoading(false);
@@ -145,10 +155,14 @@ export function useARContent() {
 
       // 2) progressive widening using radii or radius_m from admin
       for (let r of radii) {
-        setLoadingStage(`Expandindo busca (raio ${r}m)...`);
+        updateStage(`Expandindo busca (raio ${r}m)...`);
+        const radiusStart = performance.now();
         const resp = await fetchByRadius(nome_marca, lat, lon, r);
+        console.log(`[useARContent] ⏱️ Radius ${r}m: ${((performance.now() - radiusStart) / 1000).toFixed(2)}s`);
+
         if (resp && resp.conteudo) {
           await saveCachedContent(nome_marca, lat, lon, resp);
+          console.log(`[useARContent] ⏱️ Total: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
           setConteudo(resp.conteudo);
           setLoadingStage('');
           setLoading(false);
@@ -157,9 +171,12 @@ export function useARContent() {
       }
 
       // 3) try region-level fallbacks using reverse geocode from device
-      setLoadingStage('Buscando por região...');
+      updateStage('Buscando por região...');
+      const geocodeStart = performance.now();
       try {
         const rev = await fetch(`${API_CONFIG.BASE_URL}/api/reverse-geocode?lat=${lat}&lon=${lon}`);
+        console.log(`[useARContent] ⏱️ Reverse geocode: ${((performance.now() - geocodeStart) / 1000).toFixed(2)}s`);
+
         if (rev.ok) {
           const addr = await rev.json();
           const types = [
@@ -170,11 +187,15 @@ export function useARContent() {
           ];
           for (const it of types) {
             if (!it.v) continue;
-            setLoadingStage(`Buscando em ${it.v}...`);
+            updateStage(`Buscando em ${it.v}...`);
+            const regionStart = performance.now();
             const regionResp = await fetchByRegion(nome_marca, it.t, it.v);
+            console.log(`[useARContent] ⏱️ Region ${it.t}/${it.v}: ${((performance.now() - regionStart) / 1000).toFixed(2)}s`);
+
             if (regionResp && regionResp.blocos && regionResp.blocos.length) {
               const normalized = { conteudo: regionResp.blocos, nome_regiao: regionResp.nome_regiao, tipo_regiao: regionResp.tipo_regiao };
               await saveCachedContent(nome_marca, lat, lon, normalized);
+              console.log(`[useARContent] ⏱️ Total: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
               setConteudo(regionResp.blocos);
               setLoadingStage('');
               setLoading(false);
@@ -184,10 +205,12 @@ export function useARContent() {
           }
         }
       } catch (e) {
+        console.log(`[useARContent] ⏱️ Reverse geocode error after: ${((performance.now() - geocodeStart) / 1000).toFixed(2)}s`);
         // ignore reverse geocode errors
       }
 
       // fallback none
+      console.log(`[useARContent] ⏱️ Total (sem resultado): ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
       setLoadingStage('');
       setLoading(false);
       return null;
@@ -198,6 +221,7 @@ export function useARContent() {
         return null;
       }
       console.error('fetchContentForRecognition error', e);
+      console.log(`[useARContent] ⏱️ Total (erro): ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
       setError(String(e));
       setLoadingStage('');
       setLoading(false);

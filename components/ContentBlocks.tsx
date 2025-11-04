@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, Animated, TouchableOpacity, Linking } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -164,13 +165,38 @@ function TextBlock({ bloco }: { bloco: any }) {
 // ========== COMPONENTE AUXILIAR: CAROUSEL CARD ==========
 function CarouselCard({ item, index }: { item: any; index: number }) {
     const imageUrl = item?.signed_url || item?.url || item?.previewDataUrl;
+    const action = item?.action;
 
     if (!imageUrl) {
         return null;
     }
 
-    return (
-        <View key={`carousel-${index}`} style={styles.carouselCard}>
+    const handlePress = () => {
+        // Verificar se tem action.href válido
+        if (
+            action &&
+            action.href &&
+            action.href !== '/' &&
+            action.href !== '/#' &&
+            action.href !== '#' &&
+            action.href.length > 3 &&
+            (action.href.startsWith('http://') ||
+                action.href.startsWith('https://') ||
+                action.href.startsWith('tel:') ||
+                action.href.startsWith('mailto:'))
+        ) {
+            console.log('[CarouselCard] Abrindo link:', action.href);
+            Linking.openURL(action.href).catch((err) => {
+                console.error('[CarouselCard] Erro ao abrir link:', err);
+            });
+        }
+    }; return (
+        <TouchableOpacity
+            key={`carousel-${index}`}
+            style={styles.carouselCard}
+            onPress={handlePress}
+            activeOpacity={0.8}
+        >
             <Image
                 source={{ uri: imageUrl }}
                 style={styles.carouselImage}
@@ -178,7 +204,7 @@ function CarouselCard({ item, index }: { item: any; index: number }) {
                 placeholder={require('../assets/images/adaptive-icon.png')}
                 transition={200}
             />
-        </View>
+        </TouchableOpacity>
     );
 }
 
@@ -187,6 +213,16 @@ function CarouselBlock({ bloco }: { bloco: any }) {
     const items = bloco?.items || bloco?.imagens || [];
     const [isOpen, setIsOpen] = React.useState(false);
     const translateX = React.useRef(new Animated.Value(SCREEN_WIDTH)).current;
+
+    // Resetar estado quando a tela ganhar foco (após voltar do navegador)
+    useFocusEffect(
+        React.useCallback(() => {
+            return () => {
+                // Cleanup: fechar o carousel quando sair da tela
+                setIsOpen(false);
+            };
+        }, [])
+    );
 
     React.useEffect(() => {
         Animated.spring(translateX, {
@@ -210,7 +246,7 @@ function CarouselBlock({ bloco }: { bloco: any }) {
                 activeOpacity={0.8}
             >
                 <View style={styles.carouselTabHandle}>
-                    <Text style={styles.carouselTabIcon}>{isOpen ? '◀' : '▶'}</Text>
+                    <Text style={styles.carouselTabIcon}>{isOpen ? '▶' : '◀'}</Text>
                     <Text style={styles.carouselTabCount}>({items.length})</Text>
                 </View>
             </TouchableOpacity>
