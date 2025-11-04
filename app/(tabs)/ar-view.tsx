@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { API_CONFIG } from '../../config/api';
-import { ARLauncher } from '@/components/ar';
+import { ARLauncher, ARNavigationControls } from '@/components/ar';
 import { useARPayload } from '@/context/ARPayloadContext'; // ✅ Usar Context
 import { setRestartCaptureOnReturn } from '@/utils/lastARContent';
 import useARSupport from '@/hooks/useARSupport';
@@ -37,6 +37,11 @@ export default function ARViewScreen() {
     const [statusMessage, setStatusMessage] = useState(UIMessages.INITIAL);
     const [focusCounter, setFocusCounter] = useState(0); // ✅ Contador de foco (força re-execução do auto-launch)
     const [showContent, setShowContent] = useState(false); // ✅ Controla exibição do conteúdo após fechar AR
+
+    // ✅ NOVO: Estados para múltiplos modelos GLB
+    const [glbModels, setGlbModels] = useState<Array<{ url: string; blockIndex: number }>>([]);
+    const [currentModelIndex, setCurrentModelIndex] = useState(0);
+
     const launchedRef = useRef(false); // Flag para auto-LAUNCH (abrir AR)
     const launchedForContentRef = useRef(false);
     const launchedAtRef = useRef<number>(0); // ✅ Timestamp de quando lançou AR (evita reset prematuro)
@@ -299,28 +304,93 @@ export default function ARViewScreen() {
         // ✅ REMOVIDO: else if que só resetava se já estava false — agora o useFocusEffect cuida disso
     }, [payload, setGeneratedGlbUrl]);
 
+    // ✅ NOVO: Extrair URLs de GLBs dos blocos quando payload mudar
+    useEffect(() => {
+        console.log('[ARView] 🔍 Extraindo GLBs dos blocos...');
+
+        if (!payload || !payload.blocos) {
+            console.log('[ARView] ❌ Nenhum payload ou blocos disponíveis');
+            setGlbModels([]);
+            setCurrentModelIndex(0);
+            return;
+        }
+
+        // Normalizar blocos (pode vir como p.blocos.blocos ou p.blocos)
+        let blocks: any[] = [];
+        if (Array.isArray(payload.blocos)) {
+            blocks = payload.blocos;
+        } else if (payload.blocos.blocos && Array.isArray(payload.blocos.blocos)) {
+            blocks = payload.blocos.blocos;
+        }
+
+        console.log('[ARView] 📊 Blocos encontrados:', blocks.length);
+
+        // Extrair GLBs de cada bloco (prioriza glb_signed_url > glb_url)
+        const models: Array<{ url: string; blockIndex: number }> = [];
+
+        blocks.forEach((bloco, index) => {
+            if (!bloco) return;
+
+            // Verificar se bloco tem GLB (prioriza signed_url)
+            const glbUrl = bloco.glb_signed_url || bloco.glb_url || null;
+
+            if (glbUrl && typeof glbUrl === 'string' && glbUrl.includes('.glb')) {
+                console.log(`[ARView] ✅ GLB encontrado no bloco ${index}:`, glbUrl.substring(0, 100) + '...');
+                models.push({ url: glbUrl, blockIndex: index });
+            }
+
+            // Verificar itens de carousel
+            if (Array.isArray(bloco.items)) {
+                bloco.items.forEach((item: any, itemIndex: number) => {
+                    if (!item) return;
+
+                    const itemGlbUrl = item.glb_signed_url || item.glb_url || null;
+
+                    if (itemGlbUrl && typeof itemGlbUrl === 'string' && itemGlbUrl.includes('.glb')) {
+                        console.log(`[ARView] ✅ GLB encontrado no item ${itemIndex} do bloco ${index}:`, itemGlbUrl.substring(0, 100) + '...');
+                        models.push({ url: itemGlbUrl, blockIndex: index });
+                    }
+                });
+            }
+        });
+
+        console.log('[ARView] 🎯 Total de GLBs encontrados:', models.length);
+        setGlbModels(models);
+
+        // Reset índice se não há modelos ou se índice atual é maior que quantidade de modelos
+        if (models.length === 0 || currentModelIndex >= models.length) {
+            setCurrentModelIndex(0);
+        }
+    }, [payload]);
+
     // --- VARIÁVEL CHAVE: URL do Modelo Final ---
     const finalModelUrl = useMemo(() => {
-        console.log('[ARView] 🔍 Buscando modelo no payload...');
-        console.log('[ARView] 📊 finalModelUrl encontrado:', generatedGlbUrl ? 'SIM' : 'NÃO');
-        console.log('[ARView] finalModelUrl:', generatedGlbUrl || 'null');
+        console.log('[ARView] 🔍 Buscando modelo final...');
 
-        // PRIORIDADE 1: Modelo GLB gerado dinamicamente
+        // PRIORIDADE 1: Modelo GLB dos blocos (array glbModels)
+        if (glbModels.length > 0 && currentModelIndex < glbModels.length) {
+            const selectedModel = glbModels[currentModelIndex];
+            console.log('[ARView] ✅ Usando GLB do bloco', selectedModel.blockIndex, `(${currentModelIndex + 1}/${glbModels.length})`);
+            console.log('[ARView] 📊 URL:', selectedModel.url.substring(0, 100) + '...');
+            return selectedModel.url;
+        }
+
+        // PRIORIDADE 2: Modelo GLB gerado dinamicamente (fallback)
         if (generatedGlbUrl) {
-            console.log('[ARView] ✅ Usando GLB gerado');
+            console.log('[ARView] ✅ Usando GLB gerado dinamicamente');
             return generatedGlbUrl;
         }
 
-        // PRIORIDADE 2: Modelo no payload
+        // PRIORIDADE 3: Modelo no payload (fallback antigo)
         const url = findModelUrl(payload);
         if (url) {
-            console.log('[ARView] ✅ Usando modelo do payload');
+            console.log('[ARView] ✅ Usando modelo do payload (fallback)');
             return url;
         }
 
         console.log('[ARView] ❌ Nenhum modelo disponível');
         return null;
-    }, [payload, findModelUrl, generatedGlbUrl]);
+    }, [glbModels, currentModelIndex, generatedGlbUrl, payload, findModelUrl]);
 
 
     useEffect(() => {
@@ -915,6 +985,21 @@ export default function ARViewScreen() {
         return null;
     }, []);
 
+    // ✅ NOVO: Funções de navegação entre modelos
+    const handlePreviousModel = useCallback(() => {
+        if (currentModelIndex > 0) {
+            console.log('[ARView] ⬅️ Navegando para modelo anterior:', currentModelIndex - 1);
+            setCurrentModelIndex(prev => prev - 1);
+        }
+    }, [currentModelIndex]);
+
+    const handleNextModel = useCallback(() => {
+        if (currentModelIndex < glbModels.length - 1) {
+            console.log('[ARView] ➡️ Navegando para próximo modelo:', currentModelIndex + 1);
+            setCurrentModelIndex(prev => prev + 1);
+        }
+    }, [currentModelIndex, glbModels.length]);
+
     const handleVerEmRA = useCallback(async () => {
         console.log('[ARView] 🎬 ========================================');
         console.log('[ARView] 🎬 handleVerEmRA CHAMADO');
@@ -1339,6 +1424,17 @@ export default function ARViewScreen() {
                         </Pressable>
                     )}
                 </View>
+
+                {/* ✅ NOVO: Controles de navegação entre modelos */}
+                {glbModels.length > 1 && (
+                    <ARNavigationControls
+                        currentIndex={currentModelIndex}
+                        totalModels={glbModels.length}
+                        onPrevious={handlePreviousModel}
+                        onNext={handleNextModel}
+                    />
+                )}
+
                 <ARLauncher isReady={!finalModelUrl || isReady} statusMessage={statusMessage} onLaunch={handleVerEmRA} styles={styles} showButton={true} />
             </View>
         </>
