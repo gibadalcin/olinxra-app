@@ -4,7 +4,7 @@ import { Colors } from '@/constants/Colors';
 import { useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { saveToGallery } from '@/hooks/useSaveToGallery';
-import { LoadingCaptureModal } from './LoadingCaptureModal';
+import LoadingWithTips from './LoadingWithTips';
 import { compareLogo } from '@/hooks/useLogoCompare';
 import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -38,7 +38,7 @@ export function ImageDecisionModal({
     const [noContentLocation, setNoContentLocation] = useState<string | null>(null);
     const canSave = !saveDisabled && imageSource === 'camera';
     const router = useRouter();
-    const { fetchContentForRecognition } = useARContent();
+    const { fetchContentForRecognition, loadingStage } = useARContent();
     const { setPayload: setARPayload } = useARPayload(); // ✅ Hook do Context
 
     const handleCompare = React.useCallback(async () => {
@@ -328,7 +328,7 @@ export function ImageDecisionModal({
 
     return (
         <>
-            {loading && <LoadingCaptureModal visible={loading} />}
+            <LoadingWithTips visible={loading} stage={loadingStage} />
             {showNoContentModal && <NoContentToDisplayModal visible={showNoContentModal} onCancel={handleNoContentCancel} brand={noContentBrand} location={noContentLocation} />}
             <Modal visible={visible} transparent={false} animationType="slide" statusBarTranslucent={true}>
                 <View style={styles.overlay}>

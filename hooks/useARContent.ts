@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { API_CONFIG } from '../config/api';
+import { getCachedContent, saveCachedContent, cleanExpiredCache } from '../utils/contentCache';
 
 // Contract: fetchContentForRecognition(nome_marca, lat, lon, options)
 // options: { initialRadius?: number, radii?: number[], preferConsultaHelper?: boolean }
@@ -8,6 +9,7 @@ export type ARBlock = any;
 
 export function useARContent() {
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<string>('');
   const [conteudo, setConteudo] = useState<ARBlock | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -19,8 +21,8 @@ export function useARContent() {
       if (radius && Number.isFinite(radius)) body.radius_m = radius;
       const res = await fetch(`${base}/consulta-conteudo/`, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
-  const j = await res.json();
-  return j; // return full response (contains conteudo + localizacao)
+      const j = await res.json();
+      return j; // return full response (contains conteudo + localizacao)
     } catch (e) {
       console.warn('consulta helper error', e);
       return null;
@@ -33,8 +35,8 @@ export function useARContent() {
       const url = `${base}/api/conteudo?nome_marca=${encodeURIComponent(nome_marca)}&latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&radius=${encodeURIComponent(radius)}`;
       const res = await fetch(url);
       if (!res.ok) return null;
-  const j = await res.json();
-  return j; // full response with conteudo + localizacao
+      const j = await res.json();
+      return j; // full response with conteudo + localizacao
     } catch (e) {
       console.warn('fetchByRadius error', e);
       return null;
@@ -47,8 +49,8 @@ export function useARContent() {
       const url = `${base}/api/conteudo-por-regiao?nome_marca=${encodeURIComponent(nome_marca)}&tipo_regiao=${encodeURIComponent(tipo_regiao)}&nome_regiao=${encodeURIComponent(nome_regiao)}`;
       const res = await fetch(url);
       if (!res.ok) return null;
-  const j = await res.json();
-  return j; // returns {blocos, tipo_regiao, nome_regiao}
+      const j = await res.json();
+      return j; // returns {blocos, tipo_regiao, nome_regiao}
     } catch (e) {
       console.warn('fetchByRegion error', e);
       return null;
@@ -61,30 +63,53 @@ export function useARContent() {
   async function fetchContentForRecognition(nome_marca: string, lat: number, lon: number, options: any = {}) {
     setError(null);
     setLoading(true);
+    setLoadingStage('Verificando cache local...');
     setConteudo(null);
     const abort = new AbortController();
     abortRef.current = abort;
+
+    // Limpar cache expirado em background (não bloqueia)
+    cleanExpiredCache().catch(() => { });
+
     try {
+      // 0) Verificar cache primeiro (super rápido)
+      const cachedResult = await getCachedContent(nome_marca, lat, lon);
+      if (cachedResult) {
+        console.log('[useARContent] ✅ Usando cache');
+        setConteudo(cachedResult.conteudo || cachedResult);
+        setLoadingStage('');
+        setLoading(false);
+        return cachedResult;
+      }
+
       const radii = options.radii || DEFAULT_RADII;
+
       // 1) Try consulta helper first (fast path)
+      setLoadingStage('Buscando conteúdo próximo...');
       const consulta = await fetchConsultaHelper(nome_marca, lat, lon, options.initialRadius);
       if (consulta && consulta.conteudo) {
+        await saveCachedContent(nome_marca, lat, lon, consulta);
         setConteudo(consulta.conteudo);
+        setLoadingStage('');
         setLoading(false);
         return consulta; // return full response so caller can access localizacao/nome_regiao
       }
 
       // 2) progressive widening using radii or radius_m from admin
       for (let r of radii) {
+        setLoadingStage(`Expandindo busca (raio ${r}m)...`);
         const resp = await fetchByRadius(nome_marca, lat, lon, r);
         if (resp && resp.conteudo) {
+          await saveCachedContent(nome_marca, lat, lon, resp);
           setConteudo(resp.conteudo);
+          setLoadingStage('');
           setLoading(false);
           return resp; // return full response
         }
       }
 
       // 3) try region-level fallbacks using reverse geocode from device
+      setLoadingStage('Buscando por região...');
       try {
         const rev = await fetch(`${API_CONFIG.BASE_URL}/api/reverse-geocode?lat=${lat}&lon=${lon}`);
         if (rev.ok) {
@@ -97,12 +122,16 @@ export function useARContent() {
           ];
           for (const it of types) {
             if (!it.v) continue;
+            setLoadingStage(`Buscando em ${it.v}...`);
             const regionResp = await fetchByRegion(nome_marca, it.t, it.v);
             if (regionResp && regionResp.blocos && regionResp.blocos.length) {
+              const normalized = { conteudo: regionResp.blocos, nome_regiao: regionResp.nome_regiao, tipo_regiao: regionResp.tipo_regiao };
+              await saveCachedContent(nome_marca, lat, lon, normalized);
               setConteudo(regionResp.blocos);
+              setLoadingStage('');
               setLoading(false);
               // normalize return to include region metadata
-              return { conteudo: regionResp.blocos, nome_regiao: regionResp.nome_regiao, tipo_regiao: regionResp.tipo_regiao };
+              return normalized;
             }
           }
         }
@@ -111,15 +140,18 @@ export function useARContent() {
       }
 
       // fallback none
+      setLoadingStage('');
       setLoading(false);
       return null;
     } catch (e) {
       if (abort.signal.aborted) {
+        setLoadingStage('');
         setLoading(false);
         return null;
       }
       console.error('fetchContentForRecognition error', e);
       setError(String(e));
+      setLoadingStage('');
       setLoading(false);
       return null;
     }
@@ -129,5 +161,5 @@ export function useARContent() {
     try { abortRef.current && abortRef.current.abort(); } catch (e) { }
   }
 
-  return { loading, conteudo, error, fetchContentForRecognition, cancel };
+  return { loading, loadingStage, conteudo, error, fetchContentForRecognition, cancel };
 }

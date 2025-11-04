@@ -11,17 +11,17 @@ import { v4 as uuidv4 } from 'uuid';
 async function searchLogoInBackend(imageUri: string): Promise<any | null> {
     try {
         // Usa a variável do backend online definida no .env e configurada em API_CONFIG
-            // Prioriza variável de ambiente do Expo, depois React Native
-            let backendUrl = '';
-            if (process.env.EXPO_PUBLIC_BACKEND_URL) {
-                backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
-            } else if (process.env.REACT_APP_API_URL) {
-                backendUrl = process.env.REACT_APP_API_URL;
-            } else {
-                backendUrl = API_CONFIG.BASE_URL;
-            }
-            if (!backendUrl) throw new Error("Backend URL não configurada");
-            console.log("[compareLogo] Enviando para backend:", backendUrl);
+        // Prioriza variável de ambiente do Expo, depois React Native
+        let backendUrl = '';
+        if (process.env.EXPO_PUBLIC_BACKEND_URL) {
+            backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
+        } else if (process.env.REACT_APP_API_URL) {
+            backendUrl = process.env.REACT_APP_API_URL;
+        } else {
+            backendUrl = API_CONFIG.BASE_URL;
+        }
+        if (!backendUrl) throw new Error("Backend URL não configurada");
+        console.log("[compareLogo] Enviando para backend:", backendUrl);
 
         const formData = new FormData();
         formData.append("file", {
@@ -59,9 +59,13 @@ async function searchLogoInBackend(imageUri: string): Promise<any | null> {
  * Lida com a lógica completa de comparação de logo, incluindo cache e comunicação com o backend.
  */
 export async function compareLogo(imageUri: string) {
-    const SIMILARIDADE_MINIMA = 0.7;
+    // Threshold ajustado para alinhar com backend (0.38 distance = ~72.5% confidence)
+    // 70% estava rejeitando muitas capturas válidas (73-74%)
+    // 65% pode gerar falsos positivos
+    // 72% é um bom balanço entre precisão e recall
+    const SIMILARIDADE_MINIMA = 0.72;
     let finalUri: string = imageUri;
-    
+
     // 1. Manuseio do URI (base64 vs. file://)
     if (imageUri.startsWith('data:image')) {
         try {
