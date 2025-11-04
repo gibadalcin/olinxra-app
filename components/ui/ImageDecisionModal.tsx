@@ -33,6 +33,7 @@ export function ImageDecisionModal({
     const { width } = useWindowDimensions();
     const imageWidth = width * 0.8;
     const [loading, setLoading] = useState(false);
+    const [loadingMessage, setLoadingMessage] = useState<string>('');
     const [showNoContentModal, setShowNoContentModal] = useState(false);
     const [noContentBrand, setNoContentBrand] = useState<string | null>(null);
     const [noContentLocation, setNoContentLocation] = useState<string | null>(null);
@@ -44,6 +45,7 @@ export function ImageDecisionModal({
     const handleCompare = React.useCallback(async () => {
         console.log('[ImageDecisionModal] 🎬 Iniciando reconhecimento de logo...');
         setLoading(true);
+        setLoadingMessage('Reconhecendo logo...');
         let shouldCancel = true;
         try {
             console.log('[ImageDecisionModal] 📸 URI da imagem:', imageUri?.substring(0, 100) + '...');
@@ -52,6 +54,7 @@ export function ImageDecisionModal({
 
             if ((result.status === 'cached' || result.status === 'recognized') && 'data' in result && result.data && typeof result.data.name === 'string') {
                 console.log('[ImageDecisionModal] ✅ Logo reconhecida:', result.data.name);
+                setLoadingMessage('Logo reconhecida! Buscando conteúdo...');
                 // recognized -> now try fetch content by location
                 try {
                     // check location permission (do not request here; PermissionRequest handles requesting)
@@ -309,6 +312,7 @@ export function ImageDecisionModal({
         } finally {
             console.log('[ImageDecisionModal] 🏁 Finalizando reconhecimento, shouldCancel:', shouldCancel);
             setLoading(false);
+            setLoadingMessage('');
             if (shouldCancel) onCancel();
         }
     }, [imageUri, onCancel, router, fetchContentForRecognition, imageSource]);
@@ -328,7 +332,7 @@ export function ImageDecisionModal({
 
     return (
         <>
-            <LoadingWithTips visible={loading} stage={loadingStage} />
+            <LoadingWithTips visible={loading} stage={loadingStage || loadingMessage} />
             {showNoContentModal && <NoContentToDisplayModal visible={showNoContentModal} onCancel={handleNoContentCancel} brand={noContentBrand} location={noContentLocation} />}
             <Modal visible={visible} transparent={false} animationType="slide" statusBarTranslucent={true}>
                 <View style={styles.overlay}>
