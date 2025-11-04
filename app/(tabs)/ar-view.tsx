@@ -40,7 +40,7 @@ export default function ARViewScreen() {
     const [isGeneratingGlb, setIsGeneratingGlb] = useState(false); // ✅ Estado de geração de GLB
 
     // ✅ NOVO: Estados para múltiplos modelos GLB
-    const [glbModels, setGlbModels] = useState<Array<{ url: string; blockIndex: number }>>([]);
+    const [glbModels, setGlbModels] = useState<Array<{ url: string; blockIndex: number; name?: string }>>([]);
     const [currentModelIndex, setCurrentModelIndex] = useState(0);
 
     const launchedRef = useRef(false); // Flag para auto-LAUNCH (abrir AR)
@@ -331,7 +331,7 @@ export default function ARViewScreen() {
         console.log('[ARView] 📊 Total de blocos:', blocks.length);
 
         // Extrair GLBs de cada bloco (prioriza glb_signed_url > glb_url)
-        const models: Array<{ url: string; blockIndex: number }> = [];
+        const models: Array<{ url: string; blockIndex: number; name?: string }> = [];
 
         blocks.forEach((bloco, index) => {
             if (!bloco) {
@@ -352,7 +352,8 @@ export default function ARViewScreen() {
 
             if (glbUrl && typeof glbUrl === 'string' && glbUrl.includes('.glb')) {
                 console.log(`[ARView] ✅ GLB encontrado no bloco ${index} (${bloco.tipo}):`, glbUrl.substring(0, 100) + '...');
-                models.push({ url: glbUrl, blockIndex: index });
+                const modelName = bloco.titulo || bloco.descricao || `Modelo ${models.length + 1}`;
+                models.push({ url: glbUrl, blockIndex: index, name: modelName });
             } else if (bloco.glb_url || bloco.glb_signed_url) {
                 console.log(`[ARView] ⚠️ Bloco ${index} tem glb_url/glb_signed_url mas não é string válida:`, {
                     glb_url: bloco.glb_url,
@@ -381,7 +382,8 @@ export default function ARViewScreen() {
 
                     if (itemGlbUrl && typeof itemGlbUrl === 'string' && itemGlbUrl.includes('.glb')) {
                         console.log(`[ARView] ✅ GLB encontrado no item ${itemIndex} do bloco ${index}:`, itemGlbUrl.substring(0, 100) + '...');
-                        models.push({ url: itemGlbUrl, blockIndex: index });
+                        const itemName = item.titulo || item.descricao || `Modelo ${models.length + 1}`;
+                        models.push({ url: itemGlbUrl, blockIndex: index, name: itemName });
                     } else if (item.glb_url || item.glb_signed_url) {
                         console.log(`[ARView] ⚠️ Item ${itemIndex} do bloco ${index} tem glb_url/glb_signed_url mas não é string válida:`, {
                             glb_url: item.glb_url,
@@ -1504,7 +1506,7 @@ export default function ARViewScreen() {
                         <Text style={styles.reopenARText}>
                             {isGeneratingGlb
                                 ? '⏳ Preparando AR...'
-                                : (launchedForContentRef.current ? '🔄 Ver novamente em AR' : '🥽 Ver em RA')
+                                : (launchedForContentRef.current ? '🔄 Ver novamente em AR' : '🎯 Ver em RA')
                             }
                         </Text>
                     </Pressable>
@@ -1607,13 +1609,17 @@ const styles = StyleSheet.create({
     contentContainer: {
         flex: 1,
         backgroundColor: '#f5f5f5',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        marginTop: -18, // Sobrepõe 18px sobre o header
+        //paddingTop: 16,
     },
     reopenARButton: {
         backgroundColor: '#3498db',
         paddingHorizontal: 24,
         paddingVertical: 14,
-        margin: 16,
-        borderRadius: 10,
+        margin: 4,
+        borderRadius: 20,
         alignItems: 'center',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
