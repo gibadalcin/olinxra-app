@@ -9,7 +9,7 @@ import { compareLogo } from '@/hooks/useLogoCompare';
 import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
-import { setLastARContent } from '@/utils/lastARContent';
+import { useARPayload } from '@/context/ARPayloadContext'; // ✅ Usar Context ao invés de módulo
 import { useARContent } from '@/hooks/useARContent';
 import { NoContentToDisplayModal } from './NoContentToDisplay';
 
@@ -39,28 +39,40 @@ export function ImageDecisionModal({
     const canSave = !saveDisabled && imageSource === 'camera';
     const router = useRouter();
     const { fetchContentForRecognition } = useARContent();
+    const { setPayload: setARPayload } = useARPayload(); // ✅ Hook do Context
 
     const handleCompare = React.useCallback(async () => {
+        console.log('[ImageDecisionModal] 🎬 Iniciando reconhecimento de logo...');
         setLoading(true);
         let shouldCancel = true;
         try {
+            console.log('[ImageDecisionModal] 📸 URI da imagem:', imageUri?.substring(0, 100) + '...');
             const result = await compareLogo(imageUri);
+            console.log('[ImageDecisionModal] 📊 Resultado do compareLogo:', result?.status);
+
             if ((result.status === 'cached' || result.status === 'recognized') && 'data' in result && result.data && typeof result.data.name === 'string') {
+                console.log('[ImageDecisionModal] ✅ Logo reconhecida:', result.data.name);
                 // recognized -> now try fetch content by location
                 try {
                     // check location permission (do not request here; PermissionRequest handles requesting)
                     const { status } = await Location.getForegroundPermissionsAsync();
                     if (status !== 'granted') {
+                        console.warn('[ImageDecisionModal] ⚠️ Permissão de localização não concedida');
                         Alert.alert('Permissão necessária', 'Preciso da sua localização para buscar conteúdo próximo. Vá até a tela de captura e conceda a permissão.');
                         setLoading(false);
                         onCancel();
                         router.push('/(tabs)/recognizer');
                         return;
                     } else {
+                        console.log('[ImageDecisionModal] 📍 Obtendo localização atual...');
                         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
                         const lat = loc.coords.latitude;
                         const lon = loc.coords.longitude;
+                        console.log('[ImageDecisionModal] 📍 Localização obtida:', { lat, lon });
+
+                        console.log('[ImageDecisionModal] 🔍 Buscando conteúdo para marca:', result.data.name);
                         const resp = await fetchContentForRecognition(result.data.name, lat, lon);
+                        console.log('[ImageDecisionModal] 📦 Resposta fetchContent:', resp ? 'dados recebidos' : 'null');
                         // fetchContentForRecognition now returns the full backend response when available
                         // normalize to `conteudo` (array or object) and extract location metadata
                         let conteudo: any = null;
@@ -91,10 +103,12 @@ export function ImageDecisionModal({
                             }
                         }
                         if (conteudo) {
+                            console.log('[ImageDecisionModal] ✅ Conteúdo encontrado, processando blocos...');
                             // convert up to N images inside conteudo.blocos to data:URLs to guarantee availability in WebView
                             async function convertBlockImagesToDataUrls(conteudoObj: any, maxImages = 3, maxBytes = 2_500_000) {
                                 try {
                                     const blocks = conteudoObj && conteudoObj.blocos ? (Array.isArray(conteudoObj.blocos) ? conteudoObj.blocos : (conteudoObj.blocos.blocos || conteudoObj.blocos)) : [];
+                                    console.log('[ImageDecisionModal] 🖼️ Encontrados', blocks.length, 'blocos para processar');
                                     let converted = 0;
                                     for (const b of blocks) {
                                         if (converted >= maxImages) break;
@@ -146,7 +160,12 @@ export function ImageDecisionModal({
                                 } catch (e) { console.debug('[ImageDecisionModal] convertBlockImages error', e); }
                             }
                             // run conversion but don't block too long — await it to ensure payload includes data urls
-                            try { await convertBlockImagesToDataUrls(conteudo, 3, 2_500_000); } catch (e) { console.debug('[ImageDecisionModal] convert images top-level failed', e); }
+                            try {
+                                await convertBlockImagesToDataUrls(conteudo, 3, 2_500_000);
+                                console.log('[ImageDecisionModal] ✅ Conversão de imagens concluída');
+                            } catch (e) {
+                                console.debug('[ImageDecisionModal] ⚠️ convert images top-level failed', e);
+                            }
                             // build a payload minimal
                             let preview = imageUri;
                             try {
@@ -212,6 +231,15 @@ export function ImageDecisionModal({
                             if (respNomeRegiao) payload.nome_regiao = respNomeRegiao;
                             if (respTipoRegiao) payload.tipo_regiao = respTipoRegiao;
                             if (respEndereco) payload.endereco = respEndereco;
+
+                            console.log('[ImageDecisionModal] 📦 Payload montado:', {
+                                marca: payload.nome_marca,
+                                anchorMode: payload.anchorMode,
+                                temBlocos: !!payload.blocos,
+                                temLocalizacao: !!payload.localizacao,
+                                nomeRegiao: payload.nome_regiao
+                            });
+
                             // safe stringify (truncate long strings like base64)
                             try {
                                 const seen = new WeakSet();
@@ -224,26 +252,33 @@ export function ImageDecisionModal({
                                 }, 2);
                                 console.debug('[ImageDecisionModal] setting lastAR payload ->', s);
                             } catch (e) { console.debug('[ImageDecisionModal] payload stringify failed', e); }
-                            setLastARContent(payload);
+
+                            // ✅ USA CONTEXT ao invés de módulo
+                            setARPayload(payload);
+                            console.log('[ImageDecisionModal] ✅ Navegando para ar-view...');
+                            // Fecha o modal ANTES de navegar
+                            shouldCancel = true; // vai executar onCancel no finally
                             router.push('/(tabs)/ar-view');
-                            shouldCancel = false;
                         } else {
                             // No content for recognized brand: show the no-content modal with brand and location
+                            console.warn('[ImageDecisionModal] ⚠️ Marca reconhecida mas sem conteúdo disponível');
                             try { setNoContentBrand(result.data.name || 'Desconhecida'); } catch (e) { setNoContentBrand('Desconhecida'); }
                             try { setNoContentLocation(respLocalizacao || null); } catch (e) { setNoContentLocation(null); }
                             setShowNoContentModal(true);
                         }
                     }
                 } catch (e) {
-                    console.error('Erro ao buscar conteúdo por localização', e);
+                    console.error('[ImageDecisionModal] ❌ Erro ao buscar conteúdo por localização:', e);
                     Alert.alert('Erro', 'Falha ao buscar conteúdo por localização.');
                 }
             } else if (result.status === 'low_similarity') {
+                console.warn('[ImageDecisionModal] ⚠️ Reconhecimento com baixa confiança');
                 Alert.alert(
                     'Reconhecimento não confiável',
                     ('message' in result && typeof result.message === 'string') ? result.message : 'Nenhum logo reconhecido com confiança suficiente.'
                 );
             } else if (result.status === 'not_found') {
+                console.warn('[ImageDecisionModal] ⚠️ Logo não encontrado no banco');
                 // Not recognized at all: try to obtain location for display and show no-content modal
                 try {
                     const { status } = await Location.getForegroundPermissionsAsync();
@@ -262,17 +297,21 @@ export function ImageDecisionModal({
                 }
                 shouldCancel = false;
             } else if (result.status === 'error') {
+                console.error('[ImageDecisionModal] ❌ Erro no servidor:', result);
                 Alert.alert('Erro', ('error' in result && typeof result.error === 'string') ? result.error : 'Falha na comunicação com o servidor.');
             } else {
+                console.error('[ImageDecisionModal] ❌ Resposta inesperada:', result);
                 Alert.alert('Erro', 'Resposta inesperada do servidor.');
             }
         } catch (error) {
+            console.error('[ImageDecisionModal] ❌ Erro na comunicação:', error);
             Alert.alert('Erro', 'Falha na comunicação com o servidor.');
         } finally {
+            console.log('[ImageDecisionModal] 🏁 Finalizando reconhecimento, shouldCancel:', shouldCancel);
             setLoading(false);
             if (shouldCancel) onCancel();
         }
-    }, [imageUri, onCancel, router, fetchContentForRecognition]);
+    }, [imageUri, onCancel, router, fetchContentForRecognition, imageSource]);
 
     const handleSave = React.useCallback(async () => {
         if (!canSave) return;
