@@ -7,6 +7,22 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from 'react';
 import { probeARSupport } from '@/hooks/useARSupport';
 
+// 🛠️ Expõe comandos de desenvolvimento no console
+if (__DEV__) {
+    import('@/utils/devCommands').then((DevCommands) => {
+        (globalThis as any).dev = DevCommands;
+        console.log('');
+        console.log('🛠️  ========================================');
+        console.log('🛠️  COMANDOS DE DEV DISPONÍVEIS');
+        console.log('🛠️  ========================================');
+        console.log('');
+        console.log('   Digite: global.dev.help()');
+        console.log('');
+        console.log('🛠️  ========================================');
+        console.log('');
+    }).catch(() => { /* ignore */ });
+}
+
 export default function Layout() {
     // Esconde a barra de navegação do Android
     useHideNavigationBar();

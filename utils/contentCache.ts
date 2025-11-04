@@ -114,3 +114,27 @@ export async function cleanExpiredCache(): Promise<void> {
         console.warn('[Cache] Erro na limpeza automática:', error);
     }
 }
+
+/**
+ * Invalida cache de uma marca específica (todas as localizações)
+ * Útil após atualizações de GLBs no backend
+ */
+export async function invalidateBrandCache(nome_marca: string): Promise<number> {
+    try {
+        const keys = await AsyncStorage.getAllKeys();
+        const brandCacheKeys = keys.filter(k =>
+            k.startsWith(CACHE_KEY_PREFIX) && k.includes(`_${nome_marca}_`)
+        );
+
+        for (const key of brandCacheKeys) {
+            await AsyncStorage.removeItem(key);
+            console.log('[Cache] 🗑️ Invalidado cache da marca:', key);
+        }
+
+        console.log(`[Cache] ✅ Invalidados ${brandCacheKeys.length} caches da marca ${nome_marca}`);
+        return brandCacheKeys.length;
+    } catch (error) {
+        console.warn('[Cache] Erro ao invalidar cache da marca:', error);
+        return 0;
+    }
+}
