@@ -1513,7 +1513,7 @@ export default function ARViewScreen() {
 
 
                     {/* Controles de navegação entre modelos */}
-                    {glbModels.length > 1 && (
+                    {glbModels.length >= 1 && (
                         <ARNavigationControls
                             currentIndex={currentModelIndex}
                             totalModels={glbModels.length}

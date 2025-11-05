@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Dimensions, Animated, TouchableOpac
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
+import { Feather, Ionicons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -300,35 +301,21 @@ function VideoBlock({ bloco }: { bloco: any }) {
     );
 }
 
-// Mapeamento de nomes de ícones para símbolos/emojis
-const iconMap: Record<string, string> = {
-    arrowRight: '→',
-    arrowLeft: '←',
-    arrowUp: '↑',
-    arrowDown: '↓',
-    check: '✓',
-    cross: '✗',
-    star: '★',
-    heart: '♥',
-    cart: '🛒',
-    bag: '🛍️',
-    search: '🔍',
-    home: '🏠',
-    user: '👤',
-    settings: '⚙️',
-    info: 'ℹ',
-    warning: '⚠',
-    plus: '+',
-    minus: '-',
-    menu: '☰',
-    close: '✕',
-};
-
 function ButtonBlock({ bloco }: { bloco: any }) {
     const label = bloco?.label || bloco?.titulo || 'Ação';
     const action = bloco?.action;
 
-    // Mapear cores do bloco
+    // 🔍 DEBUG: Verificar estrutura do bloco
+    React.useEffect(() => {
+        console.log('[ButtonBlock] 🔍 Bloco completo:', JSON.stringify(bloco, null, 2));
+        console.log('[ButtonBlock] 📋 action:', action);
+        console.log('[ButtonBlock] 🔗 action?.href:', action?.href);
+        console.log('[ButtonBlock] 🔗 bloco?.href:', bloco?.href);
+        console.log('[ButtonBlock] 🔗 bloco?.url:', bloco?.url);
+        console.log('[ButtonBlock] 🔗 bloco?.link:', bloco?.link);
+    }, [bloco, action]);
+
+    // ✅ Suporta cor hexadecimal diretamente ou nomes de cores
     const colorMap: Record<string, string> = {
         red: '#e74c3c',
         blue: '#3498db',
@@ -340,32 +327,108 @@ function ButtonBlock({ bloco }: { bloco: any }) {
         black: '#2c3e50',
     };
 
-    const backgroundColor = bloco?.backgroundColor || colorMap[bloco?.color?.toLowerCase()] || bloco?.cor || '#e74c3c';
+    // Se bloco.color começa com #, usa direto; senão, busca no colorMap
+    const backgroundColor = bloco?.color?.startsWith('#')
+        ? bloco.color
+        : (bloco?.backgroundColor || colorMap[bloco?.color?.toLowerCase()] || bloco?.cor || '#e74c3c');
     const textColor = bloco?.textColor || bloco?.corTexto || '#fff';
 
-    // Mapear ícone
+    // ✅ Resolução dinâmica de ícones usando @expo/vector-icons
     const iconName = bloco?.icon || bloco?.icone || '';
-    const iconSymbol = iconMap[iconName] || iconName; // Se não encontrar no mapa, usa o próprio valor
     const iconInvert = bloco?.icon_invert || false;
 
-    const [isOpen, setIsOpen] = React.useState(false);
-    const translateY = React.useRef(new Animated.Value(300)).current; // 300px escondido abaixo
+    // Renderizar ícone dinamicamente - VERSÃO SIMPLIFICADA E DIRETA
+    const renderIcon = () => {
+        if (!iconName) return null;
+
+        // Mapeamento direto: nome do ícone → (família, nome-nativo)
+        // Prioriza Ionicons que tem mais ícones disponíveis
+        const iconMapping: Record<string, { family: any; name: string }> = {
+            // Ionicons (tem mais variedade)
+            'ticket': { family: Ionicons, name: 'ticket-outline' },
+            'Ticket': { family: Ionicons, name: 'ticket-outline' },
+            'calendar': { family: Ionicons, name: 'calendar-outline' },
+            'Calendar': { family: Ionicons, name: 'calendar-outline' },
+            'phone': { family: Ionicons, name: 'call-outline' },
+            'Phone': { family: Ionicons, name: 'call-outline' },
+            'mail': { family: Ionicons, name: 'mail-outline' },
+            'Mail': { family: Ionicons, name: 'mail-outline' },
+            'email': { family: Ionicons, name: 'mail-outline' },
+            'Email': { family: Ionicons, name: 'mail-outline' },
+            'location': { family: Ionicons, name: 'location-outline' },
+            'Location': { family: Ionicons, name: 'location-outline' },
+            'home': { family: Ionicons, name: 'home-outline' },
+            'Home': { family: Ionicons, name: 'home-outline' },
+            'user': { family: Ionicons, name: 'person-outline' },
+            'User': { family: Ionicons, name: 'person-outline' },
+            'person': { family: Ionicons, name: 'person-outline' },
+            'Person': { family: Ionicons, name: 'person-outline' },
+            'search': { family: Ionicons, name: 'search-outline' },
+            'Search': { family: Ionicons, name: 'search-outline' },
+            'cart': { family: Ionicons, name: 'cart-outline' },
+            'Cart': { family: Ionicons, name: 'cart-outline' },
+            'heart': { family: Ionicons, name: 'heart-outline' },
+            'Heart': { family: Ionicons, name: 'heart-outline' },
+            'star': { family: Ionicons, name: 'star-outline' },
+            'Star': { family: Ionicons, name: 'star-outline' },
+            'info': { family: Ionicons, name: 'information-circle-outline' },
+            'Info': { family: Ionicons, name: 'information-circle-outline' },
+            // Feather (fallback para ícones comuns)
+            'chevron-right': { family: Feather, name: 'chevron-right' },
+            'chevron-left': { family: Feather, name: 'chevron-left' },
+            'check': { family: Feather, name: 'check' },
+            'x': { family: Feather, name: 'x' },
+            'close': { family: Feather, name: 'x' },
+        };
+
+        // Tentar mapeamento direto primeiro
+        const mapped = iconMapping[iconName];
+        if (mapped) {
+            const IconComponent = mapped.family;
+            return <IconComponent name={mapped.name} size={20} color={textColor} style={{ marginHorizontal: 4 }} />;
+        }
+
+        // Se não tiver mapeamento, tentar Ionicons com nome lowercase + "-outline"
+        try {
+            const ionName = `${iconName.toLowerCase()}-outline`;
+            return <Ionicons name={ionName as any} size={20} color={textColor} style={{ marginHorizontal: 4 }} />;
+        } catch (e) {
+            // Se falhar, usar emoji como fallback
+            const emojiMap: Record<string, string> = {
+                'ticket': '🎫', 'calendar': '📅', 'phone': '📞',
+                'mail': '✉️', 'email': '✉️', 'location': '📍',
+                'home': '🏠', 'user': '👤', 'person': '👤',
+                'search': '🔍', 'cart': '🛒', 'heart': '❤️',
+                'star': '⭐', 'info': 'ℹ️',
+            };
+            const emoji = emojiMap[iconName.toLowerCase()] || '🎫';
+            return <Text style={{ color: textColor, fontSize: 20, marginHorizontal: 4 }}>{emoji}</Text>;
+        }
+    };
+
+    const [isOpen, setIsOpen] = React.useState(true); // Inicia ABERTO
+    const translateY = React.useRef(new Animated.Value(0)).current; // Posição aberta
 
     React.useEffect(() => {
         Animated.spring(translateY, {
-            toValue: isOpen ? 0 : 300, // 0 = visível, 300 = escondido abaixo
+            toValue: isOpen ? 0 : 300,
             useNativeDriver: true,
             tension: 50,
             friction: 8,
-        }).start();
+        }).start(() => {
+            console.log('[ButtonBlock] ✅ Animação concluída, isOpen:', isOpen);
+        });
     }, [isOpen]);
 
     return (
         <>
-            {/* ABA FIXA NA BORDA INFERIOR (sempre visível) */}
+            {/* ABA FIXA NA BORDA INFERIOR */}
             <TouchableOpacity
                 style={styles.buttonTab}
-                onPress={() => setIsOpen(!isOpen)}
+                onPress={() => {
+                    console.log('[ButtonBlock] 📌 Aba clicada, isOpen atual:', isOpen);
+                    setIsOpen(!isOpen);
+                }}
                 activeOpacity={0.8}
             >
                 <View style={styles.buttonTabHandle}>
@@ -374,55 +437,38 @@ function ButtonBlock({ bloco }: { bloco: any }) {
                 </View>
             </TouchableOpacity>
 
-            {/* DRAWER COM BOTÃO - EFEITO GLASS */}
-            <AnimatedBlurView
-                intensity={80}
-                tint="light"
-                style={[
-                    styles.buttonDrawer,
-                    {
-                        transform: [{ translateY }],
-                    },
-                ]}
+            {/* BOTÃO ANIMADO (sem container) */}
+            <Animated.View
+                style={{
+                    position: 'absolute',
+                    bottom: 30,
+                    left: 20,
+                    right: 20,
+                    transform: [{ translateY }],
+                    zIndex: 100,
+                }}
             >
                 <TouchableOpacity
                     style={[
                         styles.buttonDrawerContent,
                         { backgroundColor }
                     ]}
-                    onPress={() => {
-                        // Validar se a URL é válida antes de abrir
-                        if (action?.href &&
-                            action.href !== '/#' &&
-                            action.href !== '#' &&
-                            action.href.length > 3 &&
-                            (action.href.startsWith('http://') ||
-                                action.href.startsWith('https://') ||
-                                action.href.startsWith('tel:') ||
-                                action.href.startsWith('mailto:'))) {
-                            Linking.openURL(action.href).catch(err => {
-                                console.warn('Erro ao abrir URL:', err);
-                            });
-                        }
-                        setIsOpen(false);
-                    }}
                     activeOpacity={0.8}
+                    onPress={() => {
+                        console.log('[ButtonBlock] 🖱️ Botão PRESSIONADO!');
+                        const url = action?.href;
+                        if (url && url.startsWith('https://')) {
+                            Linking.openURL(url);
+                        }
+                    }}
                 >
-                    {!iconInvert && iconSymbol && (
-                        <Text style={[styles.buttonDrawerIcon, { color: textColor }]}>
-                            {iconSymbol}
-                        </Text>
-                    )}
+                    {!iconInvert && renderIcon()}
                     <Text style={[styles.buttonDrawerText, { color: textColor }]}>
                         {label}
                     </Text>
-                    {iconInvert && iconSymbol && (
-                        <Text style={[styles.buttonDrawerIcon, { color: textColor, marginLeft: 8, marginRight: 0 }]}>
-                            {iconSymbol}
-                        </Text>
-                    )}
+                    {iconInvert && renderIcon()}
                 </TouchableOpacity>
-            </AnimatedBlurView>
+            </Animated.View>
         </>
     );
 }
@@ -606,7 +652,7 @@ const styles = StyleSheet.create({
         width: '80%', // Máximo 80% da largura da tela
         maxWidth: 320, // Largura máxima absoluta
         height: 48, // Altura fixa do botão
-        borderRadius: 16,
+        borderRadius: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,

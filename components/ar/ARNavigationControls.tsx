@@ -14,8 +14,11 @@ export function ARNavigationControls({
     onPrevious,
     onNext,
 }: ARNavigationControlsProps) {
-    // Não renderizar se houver apenas 1 ou nenhum modelo
-    if (totalModels <= 1) {
+    console.log('[ARNavigationControls] 📊 Renderizando:', { currentIndex, totalModels });
+
+    // Não renderizar se não houver modelos
+    if (totalModels < 1) {
+        console.log('[ARNavigationControls] ❌ totalModels < 1, retornando null');
         return null;
     }
 
