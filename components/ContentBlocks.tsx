@@ -406,8 +406,8 @@ function ButtonBlock({ bloco }: { bloco: any }) {
         }
     };
 
-    const [isOpen, setIsOpen] = React.useState(true); // Inicia ABERTO
-    const translateY = React.useRef(new Animated.Value(0)).current; // Posição aberta
+    const [isOpen, setIsOpen] = React.useState(false); // Inicia FECHADO
+    const translateY = React.useRef(new Animated.Value(300)).current; // Posição fechada
 
     React.useEffect(() => {
         Animated.spring(translateY, {
@@ -437,8 +437,9 @@ function ButtonBlock({ bloco }: { bloco: any }) {
                 </View>
             </TouchableOpacity>
 
-            {/* BOTÃO ANIMADO (sem container) */}
+            {/* BOTÃO ANIMADO - pointerEvents="box-none" permite toques passarem */}
             <Animated.View
+                pointerEvents="box-none"
                 style={{
                     position: 'absolute',
                     bottom: 30,
@@ -631,7 +632,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: 140, // Altura fixa do drawer para acomodar o botão centralizado
-        backgroundColor: 'rgba(255, 255, 255, 0.2)', // Semi-transparente para efeito glass
+        backgroundColor: 'rgba(0, 0, 0, 1)', // Semi-transparente para efeito glass
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -4 },
         shadowOpacity: 0.3,
