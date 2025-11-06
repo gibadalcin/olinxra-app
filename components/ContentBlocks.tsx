@@ -421,7 +421,6 @@ function TextBlock({ bloco }: { bloco: any }) {
     // Detectar hierarquia: título > subtítulo > texto normal
     const isTitulo = tipo.includes('título') || tipo.includes('titulo');
     const isSubtitulo = tipo.includes('subtítulo') || tipo.includes('subtitulo');
-    const isTexto = tipo.includes('texto') || tipo.includes('text');
 
     return (
         <View style={styles.textBlock}>
@@ -430,21 +429,13 @@ function TextBlock({ bloco }: { bloco: any }) {
                 <Text style={styles.mainTitle}>{conteudo}</Text>
             )}
 
-            {/* SUBTÍTULO - Destaque médio */}
+            {/* SUBTÍTULO - Destaque médio (SEM duplicar no fallback) */}
             {isSubtitulo && conteudo && (
                 <Text style={styles.subtitle}>{conteudo}</Text>
             )}
 
-            {/* TEXTO NORMAL - Pode ter título interno opcional */}
-            {isTexto && (
-                <>
-                    {titulo && <Text style={styles.textTitle}>{titulo}</Text>}
-                    {conteudo && <Text style={styles.textContent}>{conteudo}</Text>}
-                </>
-            )}
-
-            {/* FALLBACK - Blocos sem tipo específico */}
-            {!isTitulo && !isSubtitulo && !isTexto && (
+            {/* TEXTO NORMAL - Pode ter título interno opcional (SOMENTE se não for título nem subtítulo) */}
+            {!isTitulo && !isSubtitulo && (
                 <>
                     {titulo && <Text style={styles.textTitle}>{titulo}</Text>}
                     {conteudo && <Text style={styles.textContent}>{conteudo}</Text>}
@@ -981,8 +972,8 @@ const styles = StyleSheet.create({
         color: '#2c2c2c',
         lineHeight: 28,
         letterSpacing: -0.3,
-        marginTop: 20,    // Espaço moderado acima
-        marginBottom: 12, // Espaço menor que título
+        marginTop: 16,    // Reduzido: espaço moderado acima (era 20)
+        marginBottom: 8,  // Reduzido: menos espaço para próximo elemento (era 12)
     },
 
     // TÍTULO DE SEÇÃO (dentro de texto normal) - Terceira hierarquia
