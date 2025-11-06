@@ -987,7 +987,7 @@ const styles = StyleSheet.create({
     textBlock: {
         backgroundColor: '#fff',
         paddingHorizontal: 20,
-        paddingVertical: 12,
+        paddingVertical: 8,     // Reduzido: 12 → 8 (menos espaço vertical interno)
         marginBottom: 0,
         borderRadius: 0,
     },
@@ -999,8 +999,8 @@ const styles = StyleSheet.create({
         color: '#1a1a1a',
         lineHeight: 36,
         letterSpacing: -0.5,
-        marginTop: 24,    // Espaço generoso acima
-        marginBottom: 16, // Espaço para separar do próximo elemento
+        marginTop: 16,    // Reduzido: 24 → 16 (mais próximo do anterior)
+        marginBottom: 12, // Reduzido: 16 → 12 (mais próximo do próximo)
     },
 
     // SUBTÍTULO - Segunda hierarquia
@@ -1010,8 +1010,8 @@ const styles = StyleSheet.create({
         color: '#2c2c2c',
         lineHeight: 28,
         letterSpacing: -0.3,
-        marginTop: 16,    // Reduzido: espaço moderado acima (era 20)
-        marginBottom: 8,  // Reduzido: menos espaço para próximo elemento (era 12)
+        marginTop: 12,    // Reduzido: 16 → 12 (mais próximo do texto anterior)
+        marginBottom: 6,  // Reduzido: 8 → 6 (mais próximo do próximo texto)
     },
 
     // TÍTULO DE SEÇÃO (dentro de texto normal) - Terceira hierarquia
@@ -1020,8 +1020,8 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#333',
         lineHeight: 24,
-        marginTop: 16,
-        marginBottom: 8,
+        marginTop: 12,    // Reduzido: 16 → 12 (mais próximo)
+        marginBottom: 6,  // Reduzido: 8 → 6 (mais próximo)
     },
 
     // TEXTO NORMAL - Corpo de texto
