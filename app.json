@@ -6,11 +6,13 @@
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
     "android": {
+      "package": "com.olinxra.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
       "permissions": [
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "ACCESS_COARSE_LOCATION",
@@ -23,6 +25,9 @@
       "expo-sqlite"
     ],
     "ios": {
+      "bundleIdentifier": "com.olinxra.app",
+      "buildNumber": "1",
+      "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Ative a localização para encontrarmos conteúdo AR próximo e acelerar suas buscas.",
         "NSCameraUsageDescription": "Precisamos acessar a câmera para capturar logomarcas e iniciar experiências AR.",
