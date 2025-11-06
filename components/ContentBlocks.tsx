@@ -51,6 +51,20 @@ export function ContentBlocks({ blocos }: ContentBlocksProps) {
         return tipo.includes('título') || tipo.includes('titulo') || tipo.includes('subtitulo') || tipo.includes('texto') || tipo.includes('text');
     });
 
+    // 🔍 DEBUG: Verificar se há blocos duplicados
+    React.useEffect(() => {
+        console.log('[ContentBlocks] 📊 Total de blocos recebidos:', blocos.length);
+        console.log('[ContentBlocks] 📝 Total de textBlocks:', textBlocks.length);
+
+        textBlocks.forEach((b, idx) => {
+            console.log(`[ContentBlocks] 📄 textBlock[${idx}]:`, {
+                tipo: b?.tipo,
+                titulo: b?.titulo ? b.titulo.substring(0, 20) + '...' : 'NULL',
+                conteudo: b?.conteudo ? b.conteudo.substring(0, 30) + '...' : 'NULL'
+            });
+        });
+    }, [blocos, textBlocks]);
+
     const otherBlocks = blocos.filter((b) => {
         const tipo = b?.tipo?.toLowerCase() || '';
         const subtipo = b?.subtipo?.toLowerCase() || '';
@@ -153,13 +167,23 @@ function BlockRenderer({ bloco, index }: { bloco: any; index: number }) {
     const tipo = bloco?.tipo?.toLowerCase() || 'unknown';
     const subtipo = bloco?.subtipo?.toLowerCase() || '';
 
+    // 🔍 DEBUG: Log de cada renderização
+    React.useEffect(() => {
+        console.log(`[BlockRenderer ${index}] 🎬 Renderizando:`, {
+            tipo: bloco?.tipo,
+            isTitulo: tipo.includes('título') || tipo.includes('titulo'),
+            isSubtitulo: tipo.includes('subtítulo') || tipo.includes('subtitulo'),
+            isTexto: tipo.includes('texto') || tipo.includes('text')
+        });
+    }, [bloco, index, tipo]);
+
     // HEADER/TOPO - Geralmente contém imagem principal
     if (tipo.includes('header') || tipo.includes('topo') || tipo.includes('imagem') || subtipo === 'header') {
         return <HeaderBlock bloco={bloco} />;
     }
 
-    // TEXTO/TÍTULO
-    if (tipo.includes('texto') || tipo.includes('text') || tipo.includes('título') || tipo.includes('titulo')) {
+    // TEXTO/TÍTULO/SUBTÍTULO - Todos vão para TextBlock
+    if (tipo.includes('texto') || tipo.includes('text') || tipo.includes('título') || tipo.includes('titulo') || tipo.includes('subtítulo') || tipo.includes('subtitulo')) {
         return <TextBlock bloco={bloco} />;
     }
 
