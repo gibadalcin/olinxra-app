@@ -1,0 +1,4 @@
+# EAS Build ignore file
+# Este arquivo força o EAS a usar git para coletar arquivos
+# ao invés de criar um tarball manualmente, o que resolve
+# problemas com caracteres especiais em nomes de pastas (como parênteses)
