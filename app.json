@@ -1,5 +1,6 @@
 {
   "expo": {
+    "orientation": "portrait",
     "name": "olinxra-app",
     "slug": "olinxra-app",
     "scheme": "olinxra-app",
