@@ -10,6 +10,10 @@
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
       ]
     },
@@ -24,6 +28,18 @@
         "NSCameraUsageDescription": "Precisamos acessar a câmera para capturar logomarcas e iniciar experiências AR.",
         "NSPhotoLibraryUsageDescription": "Precisamos acessar suas fotos para permitir envio e comparação de imagens."
       }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0105cf14-9575-4bdf-85df-c494395ed03c"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0105cf14-9575-4bdf-85df-c494395ed03c"
     }
   }
 }
