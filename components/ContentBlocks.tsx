@@ -418,19 +418,33 @@ function TextBlock({ bloco }: { bloco: any }) {
         return null;
     }
 
-    // Detectar se é título, subtítulo ou texto
+    // Detectar hierarquia: título > subtítulo > texto normal
     const isTitulo = tipo.includes('título') || tipo.includes('titulo');
     const isSubtitulo = tipo.includes('subtítulo') || tipo.includes('subtitulo');
+    const isTexto = tipo.includes('texto') || tipo.includes('text');
 
     return (
         <View style={styles.textBlock}>
+            {/* TÍTULO PRINCIPAL - Maior destaque visual */}
             {isTitulo && conteudo && (
                 <Text style={styles.mainTitle}>{conteudo}</Text>
             )}
+
+            {/* SUBTÍTULO - Destaque médio */}
             {isSubtitulo && conteudo && (
                 <Text style={styles.subtitle}>{conteudo}</Text>
             )}
-            {!isTitulo && !isSubtitulo && (
+
+            {/* TEXTO NORMAL - Pode ter título interno opcional */}
+            {isTexto && (
+                <>
+                    {titulo && <Text style={styles.textTitle}>{titulo}</Text>}
+                    {conteudo && <Text style={styles.textContent}>{conteudo}</Text>}
+                </>
+            )}
+
+            {/* FALLBACK - Blocos sem tipo específico */}
+            {!isTitulo && !isSubtitulo && !isTexto && (
                 <>
                     {titulo && <Text style={styles.textTitle}>{titulo}</Text>}
                     {conteudo && <Text style={styles.textContent}>{conteudo}</Text>}
@@ -938,39 +952,56 @@ const styles = StyleSheet.create({
         marginLeft: 4,
     },
 
-    // Texto
+    // ========================================
+    // 📝 BLOCOS DE TEXTO - Hierarquia Visual
+    // ========================================
     textBlock: {
         backgroundColor: '#fff',
-        padding: 16,
-        marginBottom: 0, // Sem espaço entre blocos de texto
-        marginHorizontal: 0, // Largura total
-        borderRadius: 0, // Sem bordas arredondadas
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        marginBottom: 0,
+        borderRadius: 0,
     },
+
+    // TÍTULO PRINCIPAL - Máxima hierarquia visual
     mainTitle: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: '800',
-        color: '#111',
-        marginBottom: 8,
-        lineHeight: 32,
-        marginTop: 32,
+        color: '#1a1a1a',
+        lineHeight: 36,
+        letterSpacing: -0.5,
+        marginTop: 24,    // Espaço generoso acima
+        marginBottom: 16, // Espaço para separar do próximo elemento
     },
+
+    // SUBTÍTULO - Segunda hierarquia
     subtitle: {
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: '600',
-        color: '#444',
-        marginBottom: 8,
-        lineHeight: 26,
+        color: '#2c2c2c',
+        lineHeight: 28,
+        letterSpacing: -0.3,
+        marginTop: 20,    // Espaço moderado acima
+        marginBottom: 12, // Espaço menor que título
     },
+
+    // TÍTULO DE SEÇÃO (dentro de texto normal) - Terceira hierarquia
     textTitle: {
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: '600',
-        color: '#222',
+        color: '#333',
+        lineHeight: 24,
+        marginTop: 16,
         marginBottom: 8,
     },
+
+    // TEXTO NORMAL - Corpo de texto
     textContent: {
-        fontSize: 15,
-        lineHeight: 22,
-        color: '#444',
+        fontSize: 16,
+        lineHeight: 25,
+        color: '#555',
+        letterSpacing: 0.1,
+        marginBottom: 4,
     },
 
     // Carrossel
