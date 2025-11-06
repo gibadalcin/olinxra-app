@@ -40,7 +40,7 @@ export function ImageDecisionModal({
     const canSave = !saveDisabled && imageSource === 'camera';
     const router = useRouter();
     const { fetchContentForRecognition, loadingStage } = useARContent();
-    const { setPayload: setARPayload } = useARPayload(); // ✅ Hook do Context
+    const { setPayload: setARPayload, headerLocalMap, prefetchImagesForPayload } = useARPayload(); // ✅ Hook do Context
 
     const handleCompare = React.useCallback(async () => {
         console.log('[ImageDecisionModal] 🎬 Iniciando reconhecimento de logo...');
@@ -256,9 +256,63 @@ export function ImageDecisionModal({
                                 console.debug('[ImageDecisionModal] setting lastAR payload ->', s);
                             } catch (e) { console.debug('[ImageDecisionModal] payload stringify failed', e); }
 
-                            // ✅ USA CONTEXT ao invés de módulo
+                            // Inicia prefetch explícito ANTES de setARPayload para dar mais headroom ao download do header
+                            try {
+                                console.log('[ImageDecisionModal] ▶️ Iniciando prefetchImagesForPayload ANTES de setARPayload');
+                                // kick off prefetch (non-blocking) - context will also run its own prefetch em setPayload
+                                try { prefetchImagesForPayload && prefetchImagesForPayload(payload); } catch (e) { /* swallow */ }
+                                // tenta detectar filename do header (heurística similar ao contexto)
+                                const findHeaderFilename = (p: any) => {
+                                    try {
+                                        const blocks = p && (p.blocos || p) ? (Array.isArray(p.blocos) ? p.blocos : (p.blocos && Array.isArray(p.blocos.blocos) ? p.blocos.blocos : (Array.isArray(p) ? p : []))) : [];
+                                        for (const b of blocks) {
+                                            if (!b) continue;
+                                            const filename = b.filename || b.nome || (b.signed_url ? String(b.signed_url).split('/').pop() : null);
+                                            const isHeader = (String(b?.subtipo || '').toLowerCase() === 'header') || (filename && String(filename).toLowerCase().includes('topo'));
+                                            if (isHeader && filename) return filename;
+                                            if (b.items && Array.isArray(b.items)) {
+                                                for (const it of b.items) {
+                                                    const ifname = it.filename || it.nome || (it.signed_url ? String(it.signed_url).split('/').pop() : null);
+                                                    const iHeader = (String(it?.subtipo || '').toLowerCase() === 'header') || (ifname && String(ifname).toLowerCase().includes('topo'));
+                                                    if (iHeader && ifname) return ifname;
+                                                }
+                                            }
+                                        }
+                                    } catch (e) { /* ignore */ }
+                                    return null;
+                                };
+
+                                const headerFilename = findHeaderFilename(payload);
+                                // kick off prefetch (non-blocking) - context will also run its own prefetch in setPayload
+                                try { prefetchImagesForPayload && prefetchImagesForPayload(payload); } catch (e) { /* swallow */ }
+
+                                const waitForHeader = async (filename: string | null, timeoutMs = 1200) => {
+                                    if (!filename) return false;
+                                    const start = Date.now();
+                                    const poll = async () => {
+                                        if (headerLocalMap && headerLocalMap[filename]) return true;
+                                        if (Date.now() - start >= timeoutMs) return false;
+                                        await new Promise((r) => setTimeout(r, 80));
+                                        return poll();
+                                    };
+                                    try {
+                                        return await poll();
+                                    } catch (e) { return false; }
+                                };
+
+                                const cached = await waitForHeader(headerFilename, 1200);
+                                if (cached) {
+                                    console.log('[ImageDecisionModal] ✅ Header cache pronto antes de setARPayload:', headerFilename, headerLocalMap && headerLocalMap[headerFilename]);
+                                } else {
+                                    console.log('[ImageDecisionModal] ℹ️ Header cache não pronto em 1200ms, vai registrar payload e navegar de qualquer forma', headerFilename);
+                                }
+                            } catch (e) {
+                                console.warn('[ImageDecisionModal] Erro ao aguardar cache do header', e);
+                            }
+
+                            // Agora que demos um headstart no download, registra o payload no contexto
+                            console.log('[ImageDecisionModal] ✅ Registrando payload no contexto e navegando para ar-view...');
                             setARPayload(payload);
-                            console.log('[ImageDecisionModal] ✅ Navegando para ar-view...');
                             // Fecha o modal ANTES de navegar
                             shouldCancel = true; // vai executar onCancel no finally
                             router.push('/(tabs)/ar-view');

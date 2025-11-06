@@ -1,14 +1,25 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Animated, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Animated, TouchableOpacity, Linking, Alert } from 'react-native';
 import { Image } from 'expo-image';
+import * as FileSystem from 'expo-file-system';
+// Alguns métodos do legacy foram marcados como deprecated na nova API.
+// Importamos o legacy se estiver disponível para manter compatibilidade e evitar que a
+// chamada a getInfoAsync lance em runtime em algumas versões do SDK.
+let FileSystemLegacy: any = null;
+try {
+    // require é usado para permitir que bundlers incluam o legacy apenas se existir
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    FileSystemLegacy = require('expo-file-system/legacy');
+} catch (e) {
+    FileSystemLegacy = null;
+}
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { useARPayload } from '@/context/ARPayloadContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// Componente BlurView animado para efeito glass
-const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
+const TAB_BAR_HEIGHT = 0; // manter em sincronia com CustomTabBar.tsx
 
 interface ContentBlocksProps {
     blocos: any[];
@@ -26,6 +37,15 @@ export function ContentBlocks({ blocos }: ContentBlocksProps) {
         return tipo.includes('imagem') && (tipo.includes('topo') || subtipo === 'header');
     });
 
+    // cache local de headers (map filename -> uri)
+    const [headerCache, setHeaderCache] = React.useState<Record<string, string>>({});
+    const headerKey = imagemTopo
+        ? (imagemTopo?.filename || imagemTopo?.nome || String((imagemTopo?.signed_url || imagemTopo?.url || imagemTopo?.previewDataUrl || '').split('/').pop()))
+        : null;
+
+    // ler mapa provido pelo ARPayloadContext (download antecipado realizado no contexto)
+    const { headerLocalMap } = useARPayload();
+
     const textBlocks = blocos.filter((b) => {
         const tipo = b?.tipo?.toLowerCase() || '';
         return tipo.includes('título') || tipo.includes('titulo') || tipo.includes('subtitulo') || tipo.includes('texto') || tipo.includes('text');
@@ -36,28 +56,96 @@ export function ContentBlocks({ blocos }: ContentBlocksProps) {
         const subtipo = b?.subtipo?.toLowerCase() || '';
         const isImagemTopo = tipo.includes('imagem') && (tipo.includes('topo') || subtipo === 'header');
         const isText = tipo.includes('título') || tipo.includes('titulo') || tipo.includes('subtitulo') || tipo.includes('texto') || tipo.includes('text');
-        return !isImagemTopo && !isText;
+        const isButton = tipo.includes('botao') || tipo === 'botao_destaque' || tipo === 'botao_default';
+        const isCarousel = tipo.includes('carousel') || tipo.includes('carrossel') || tipo.includes('galeria');
+        return !isImagemTopo && !isText && !isButton && !isCarousel;
     });
 
+    // Separar botões para renderizar FORA do ScrollView, como overlay fixo
+    const buttonBlocks = blocos.filter((b) => {
+        const tipo = b?.tipo?.toLowerCase() || '';
+        return tipo.includes('botao') || tipo === 'botao_destaque' || tipo === 'botao_default';
+    });
+
+    // Separar carrosseis para renderizar FORA do ScrollView, como overlay fixo
+    const carouselBlocks = blocos.filter((b) => {
+        const tipo = b?.tipo?.toLowerCase() || '';
+        return tipo.includes('carousel') || tipo.includes('carrossel') || tipo.includes('galeria');
+    });
+
+    // ✅ SIMPLIFICADO: Prefetch delegado ao ARPayloadContext
+    // Apenas garante que Image.prefetch seja chamado (cache nativo do React Native)
+    React.useEffect(() => {
+        try {
+            const urls: string[] = [];
+
+            // Coleta URLs para Image.prefetch (cache nativo)
+            if (imagemTopo) {
+                const u = imagemTopo?.signed_url || imagemTopo?.signedUrl || imagemTopo?.url;
+                if (u && !String(u).startsWith('data:')) urls.push(u);
+            }
+
+            otherBlocks.forEach((b) => {
+                if (b?.items && Array.isArray(b.items)) {
+                    b.items.forEach((it: any) => {
+                        const u = it?.signed_url || it?.signedUrl || it?.url;
+                        if (u && !String(u).startsWith('data:')) urls.push(u);
+                    });
+                }
+            });
+
+            // Image.prefetch para cache nativo (rápido, não bloqueia)
+            if (urls.length > 0 && Image?.prefetch) {
+                console.log('[ContentBlocks] 🔁 Image.prefetch para', urls.length, 'URLs');
+                urls.forEach((u) => {
+                    Image.prefetch(u).catch(() => { }); // swallow errors
+                });
+            }
+
+            // ✅ Contexto já está fazendo download para FileSystem em background
+            // Apenas sincronizamos headerCache se contexto já tiver URI
+            if (headerKey && headerLocalMap?.[headerKey]) {
+                setHeaderCache((prev) => ({ ...prev, [headerKey]: headerLocalMap[headerKey] }));
+            }
+        } catch (e) {
+            console.warn('[ContentBlocks] prefetch error', e);
+        }
+    }, [blocos, headerKey, headerLocalMap]);
+
+    // preferir uri provida pelo contexto (headerLocalMap) quando disponível
+    const externalLocalHeaderUri = headerKey ? (headerLocalMap?.[headerKey] || headerCache[headerKey]) : null;
+
     return (
-        <ScrollView
-            style={styles.container}
-            contentContainerStyle={styles.contentContainer}
-            showsVerticalScrollIndicator={true}
-        >
-            {/* 1️⃣ IMAGEM TOPO - Primeira, largura total */}
-            {imagemTopo && <HeaderBlock bloco={imagemTopo} />}
+        <View style={styles.container}>
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={styles.contentContainer}
+                showsVerticalScrollIndicator={true}
+            >
+                {/* 1️⃣ IMAGEM TOPO - Primeira, largura total */}
+                {imagemTopo && <HeaderBlock bloco={imagemTopo} localHeaderUri={externalLocalHeaderUri} />}
 
-            {/* 2️⃣ TÍTULO, SUBTÍTULO, TEXTO - Na sequência */}
-            {textBlocks.map((bloco, index) => (
-                <BlockRenderer key={`text-${index}`} bloco={bloco} index={index} />
+                {/* 2️⃣ TÍTULO, SUBTÍTULO, TEXTO - Na sequência */}
+                {textBlocks.map((bloco, index) => (
+                    <BlockRenderer key={`text-${index}`} bloco={bloco} index={index} />
+                ))}
+
+                {/* 3️⃣ OUTROS BLOCOS - Carrossel, Vídeo, etc. (EXCETO botões) */}
+                {otherBlocks.map((bloco, index) => (
+                    <BlockRenderer key={`other-${index}`} bloco={bloco} index={index} />
+                ))}
+            </ScrollView>
+
+            {/* 4️⃣ CAROUSEL (overlay fixo) */}
+            {carouselBlocks.map((bloco, index) => (
+                <CarouselBlock key={`carousel-overlay-${index}`} bloco={bloco} />
             ))}
 
-            {/* 3️⃣ OUTROS BLOCOS - Carrossel, Vídeo, Botões */}
-            {otherBlocks.map((bloco, index) => (
-                <BlockRenderer key={`other-${index}`} bloco={bloco} index={index} />
+            {/* 5️⃣ BOTÕES (overlay fixo acima do TabBar) */}
+            {buttonBlocks.map((bloco, index) => (
+                <ButtonBlock key={`button-${index}`} bloco={bloco} />
             ))}
-        </ScrollView>
+        </View>
     );
 }
 
@@ -102,10 +190,165 @@ function BlockRenderer({ bloco, index }: { bloco: any; index: number }) {
 
 // ========== COMPONENTES DE BLOCOS ==========
 
-function HeaderBlock({ bloco }: { bloco: any }) {
+function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco: any; localHeaderUri?: string | null }) {
     const imageUrl = bloco?.signed_url || bloco?.url || bloco?.previewDataUrl;
     const titulo = bloco?.titulo || bloco?.label;
+    const glbUrl = bloco?.glb_signed_url || bloco?.glb_url;
     const [imageAspectRatio, setImageAspectRatio] = React.useState<number>(16 / 9);
+    const [localUri, setLocalUri] = React.useState<string | null>(null);
+
+    // Preferir mapa de URIs locais provido pelo contexto. Isso garante que
+    // o Header passe a usar o arquivo local assim que o contexto o baixar,
+    // sem tentar baixar novamente aqui (centralizamos o download no contexto).
+    const { headerLocalMap } = useARPayload();
+
+    const filename = bloco?.filename || bloco?.nome || String((imageUrl || '').split('/').pop());
+    const ctxLocal = headerLocalMap?.[filename] || externalLocalHeaderUri || null;
+
+    // para medir tempos: quando o HeaderBlock monta e quando encontra URI local
+    const [mountedAt] = React.useState<number>(() => Date.now());
+    const [foundAt, setFoundAt] = React.useState<number | null>(null);
+
+    // DEBUG: checar e logar fontes e estado local
+    React.useEffect(() => {
+        console.log('[HeaderBlock] 🔍 filename:', filename);
+        console.log('[HeaderBlock] 🔍 ctxLocal present?', !!ctxLocal, ctxLocal);
+        console.log('[HeaderBlock] 🔍 externalLocalHeaderUri present?', !!externalLocalHeaderUri, externalLocalHeaderUri);
+        console.log('[HeaderBlock] 🔍 previewDataUrl present?', !!bloco?.previewDataUrl);
+        console.log('[HeaderBlock] 🔍 imageUrl (remote) present?', !!imageUrl && typeof imageUrl === 'string' && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')));
+    }, [filename, ctxLocal, externalLocalHeaderUri, bloco?.previewDataUrl, imageUrl]);
+
+    // payload não é utilizado aqui; removido para evitar erro de variável não utilizada
+
+    // ✅ ESTRATÉGIA: Mostrar algo IMEDIATAMENTE (preview ou URL remota), melhorar depois se houver cache local
+    // Prioridade de renderização:
+    // 1. Cache local (file://) - melhor performance
+    // 2. Preview base64 (data:) - carregamento instantâneo
+    // 3. URL remota (https://) - fallback final
+
+    // Estado inicial: mostrar preview ou URL remota IMEDIATAMENTE (sem esperar cache)
+    const initialSrc = bloco?.previewDataUrl || imageUrl;
+    const [displayUri, setDisplayUri] = React.useState<string>(
+        ctxLocal || localUri || initialSrc || ''
+    );
+
+    // ✅ UPGRADE PROGRESSIVO: Se cache local aparecer, upgradar para ele (melhor qualidade/performance)
+    React.useEffect(() => {
+        // Se já temos cache local, usar direto
+        if (ctxLocal) {
+            setDisplayUri(ctxLocal);
+            setFoundAt(Date.now());
+            return;
+        }
+        if (localUri) {
+            setDisplayUri(localUri);
+            setFoundAt(Date.now());
+            return;
+        }
+
+        // Senão, aguardar cache aparecer no contexto (mas SEM bloquear renderização)
+        let mounted = true;
+        const checkInterval = setInterval(() => {
+            if (!mounted) return;
+            const candidate = headerLocalMap?.[filename];
+            if (candidate) {
+                console.log('[HeaderBlock] � Cache local disponível, fazendo upgrade:', filename);
+                setFoundAt(Date.now());
+                setDisplayUri(candidate);
+                clearInterval(checkInterval);
+            }
+        }, 100);
+
+        // Desiste depois de 2s (mas continua mostrando preview/URL remota)
+        const timeout = setTimeout(() => {
+            clearInterval(checkInterval);
+        }, 2000);
+
+        return () => {
+            mounted = false;
+            clearInterval(checkInterval);
+            clearTimeout(timeout);
+        };
+    }, [filename, headerLocalMap, ctxLocal, localUri]);
+
+    // ✅ REMOVIDO: Prefetch duplicado - ARPayloadContext já faz isso em background
+    // Deixamos apenas o contexto gerenciar downloads para evitar redundância
+
+    // ✅ SIMPLIFICADO: Apenas verifica se já existe em cache, não baixa novamente
+    // ARPayloadContext já está fazendo download em background
+    React.useEffect(() => {
+        (async () => {
+            try {
+                // Se contexto já forneceu URI, usar direto
+                if (ctxLocal) {
+                    setLocalUri(ctxLocal);
+                    return;
+                }
+
+                // Verifica SE JÁ EXISTE em cache (não baixa, só consulta)
+                const getCacheDir = () => {
+                    return (FileSystem as any).cacheDirectory || (FileSystem as any).cacheDirectoryUri || (FileSystem as any).documentDirectory || '';
+                };
+
+                const cacheDir = getCacheDir();
+                if (!cacheDir) return;
+                const dest = `${cacheDir}olx_header_${encodeURIComponent(String(filename))}`;
+
+                const info = FileSystemLegacy?.getInfoAsync
+                    ? await FileSystemLegacy.getInfoAsync(dest)
+                    : await (FileSystem as any).getInfoAsync(dest);
+
+                if (info && info.exists) {
+                    console.log('[HeaderBlock] ✅ Cache já existe:', info.uri);
+                    setLocalUri(info.uri);
+                }
+            } catch (e) {
+                // swallow
+            }
+        })();
+    }, [filename, ctxLocal]);
+
+    // Log do src efetivo para debugging rápido
+    React.useEffect(() => {
+        console.log('[HeaderBlock] ℹ️ displayUri atual:', displayUri);
+        console.log('[HeaderBlock] ℹ️ Tipo de fonte:',
+            displayUri?.startsWith('file://') ? 'CACHE LOCAL (melhor)' :
+                displayUri?.startsWith('data:') ? 'PREVIEW BASE64 (rápido)' :
+                    displayUri?.startsWith('http') ? 'URL REMOTA (lento)' :
+                        'DESCONHECIDO'
+        );
+    }, [displayUri]);
+
+    const { payload } = useARPayload();
+
+    const handleARPress = async () => {
+        const brandKey = payload?.marca || payload?.nome_marca || payload?.nomeMarca || null;
+        const brandEntry = brandKey && payload?.anchorData && payload.anchorData.totem && payload.anchorData.totem.brands ? payload.anchorData.totem.brands[brandKey] : null;
+        const brandModel = brandEntry?.modelUrl || brandEntry?.model_url || null;
+        const brandUrl = brandEntry?.url || null;
+
+        const modelToOpen = glbUrl || brandModel;
+        if (modelToOpen) {
+            console.log('[HeaderBlock] 🎯 Abrindo AR nativo com GLB:', modelToOpen);
+            try {
+                const sceneViewerUrl = `https://arvr.google.com/scene-viewer/1.2?file=${encodeURIComponent(modelToOpen)}&mode=ar_preferred`;
+                await Linking.openURL(sceneViewerUrl);
+                console.log('[HeaderBlock] ✅ Scene Viewer aberto com sucesso!');
+            } catch (error) {
+                console.error('[HeaderBlock] ❌ Erro ao abrir Scene Viewer:', error);
+            }
+            return;
+        }
+
+        if (brandUrl) {
+            console.log('[HeaderBlock] ℹ️ Sem GLB — abrindo URL da marca como fallback:', brandUrl);
+            try { await Linking.openURL(brandUrl); } catch (e) { console.error('[HeaderBlock] ❌ Erro abrindo brand URL:', e); }
+            return;
+        }
+
+        console.log('[HeaderBlock] ❌ Nenhum GLB ou modelo disponível para este header');
+        Alert.alert('AR não disponível', 'Não há modelo 3D disponível para este item.');
+    };
 
     if (!imageUrl) {
         return null;
@@ -114,20 +357,52 @@ function HeaderBlock({ bloco }: { bloco: any }) {
     return (
         <View style={styles.headerBlock}>
             {titulo && <Text style={styles.headerTitle}>{titulo}</Text>}
-            <Image
-                source={{ uri: imageUrl }}
-                style={[styles.headerImage, { aspectRatio: imageAspectRatio }]}
-                contentFit="contain"
-                placeholder={require('../assets/images/adaptive-icon.png')}
-                transition={200}
-                onLoad={(event) => {
-                    // Calcula aspect ratio da imagem real
-                    const { width, height } = event.source;
-                    if (width && height) {
-                        setImageAspectRatio(width / height);
-                    }
-                }}
-            />
+            <View style={styles.headerImageContainer}>
+                <Image
+                    source={{ uri: displayUri || imageUrl }}
+                    style={[styles.headerImage, { aspectRatio: imageAspectRatio }]}
+                    contentFit="contain"
+                    // ✅ Placeholder inteligente: preview base64 se disponível
+                    placeholder={bloco?.previewDataUrl || require('../assets/images/adaptive-icon.png')}
+                    placeholderContentFit="cover"
+                    // ✅ Sem transição (renderização imediata)
+                    transition={0}
+                    // ✅ Cache agressivo
+                    cachePolicy="memory-disk"
+                    onLoad={(event) => {
+                        const loadAt = Date.now();
+                        const latency = loadAt - mountedAt;
+                        console.log('[HeaderBlock] 🖼️ Image onLoad:', filename);
+                        console.log('[HeaderBlock] ⏱️ Latência total:', latency, 'ms');
+                        console.log('[HeaderBlock] 📊 Fonte:',
+                            displayUri?.startsWith('file://') ? 'CACHE' :
+                                displayUri?.startsWith('data:') ? 'PREVIEW' : 'REMOTA'
+                        );
+
+                        if (foundAt) {
+                            console.log('[HeaderBlock] ⏱️ Tempo cache->render:', loadAt - foundAt, 'ms');
+                        }
+
+                        // Calcula aspect ratio da imagem real
+                        const w = (event && (event as any).source && (event as any).source.width) || (event && (event as any).width) || null;
+                        const h = (event && (event as any).source && (event as any).source.height) || (event && (event as any).height) || null;
+                        if (w && h) {
+                            setImageAspectRatio(w / h);
+                        }
+                    }}
+                />                {/* Botão "Ver em AR" - só aparece se tiver GLB */}
+                {glbUrl && (
+                    <TouchableOpacity
+                        style={styles.headerARButton}
+                        onPress={handleARPress}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="cube-outline" size={18} color="#fff" />
+                        <Text style={styles.headerARButtonText}>Ver em AR</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
         </View>
     );
 }
@@ -167,45 +442,119 @@ function TextBlock({ bloco }: { bloco: any }) {
 function CarouselCard({ item, index }: { item: any; index: number }) {
     const imageUrl = item?.signed_url || item?.url || item?.previewDataUrl;
     const action = item?.action;
+    const glbUrl = item?.glb_signed_url || item?.glb_url;
+    const { headerLocalMap, payload } = useARPayload();
+
+    // 🔍 DEBUG: Verificar estrutura do item
+    React.useEffect(() => {
+        console.log(`[CarouselCard ${index}] 🔍 Item:`, {
+            imageUrl: imageUrl ? 'EXISTE' : 'NULL',
+            action: action?.href || 'SEM ACTION',
+            glbUrl: glbUrl || 'SEM GLB',
+            keys: Object.keys(item),
+        });
+    }, [item, index, imageUrl, glbUrl, action]);
 
     if (!imageUrl) {
         return null;
     }
 
-    const handlePress = () => {
-        // Verificar se tem action.href válido
+    const handleImagePress = () => {
+        console.log('[CarouselCard] 📌 Imagem clicada!');
+        console.log('[CarouselCard] 🔍 action completo:', action);
+
+        // action pode ser string direta ou objeto com href
+        const href = typeof action === 'string' ? action : action?.href;
+
+        console.log('[CarouselCard] 🔗 href extraído:', href);
+
+        // Verificar se tem href válido
         if (
-            action &&
-            action.href &&
-            action.href !== '/' &&
-            action.href !== '/#' &&
-            action.href !== '#' &&
-            action.href.length > 3 &&
-            (action.href.startsWith('http://') ||
-                action.href.startsWith('https://') ||
-                action.href.startsWith('tel:') ||
-                action.href.startsWith('mailto:'))
+            href &&
+            href !== '/' &&
+            href !== '/#' &&
+            href !== '#' &&
+            href.length > 3 &&
+            (href.startsWith('http://') ||
+                href.startsWith('https://') ||
+                href.startsWith('tel:') ||
+                href.startsWith('mailto:'))
         ) {
-            console.log('[CarouselCard] Abrindo link:', action.href);
-            Linking.openURL(action.href).catch((err) => {
-                console.error('[CarouselCard] Erro ao abrir link:', err);
+            console.log('[CarouselCard] ✅ Abrindo link:', href);
+            Linking.openURL(href).catch((err) => {
+                console.error('[CarouselCard] ❌ Erro ao abrir link:', err);
             });
+        } else {
+            console.log('[CarouselCard] ⚠️ Sem link válido para abrir, href:', href);
         }
-    }; return (
-        <TouchableOpacity
-            key={`carousel-${index}`}
-            style={styles.carouselCard}
-            onPress={handlePress}
-            activeOpacity={0.8}
-        >
-            <Image
-                source={{ uri: imageUrl }}
-                style={styles.carouselImage}
-                contentFit="cover"
-                placeholder={require('../assets/images/adaptive-icon.png')}
-                transition={200}
-            />
-        </TouchableOpacity>
+    };
+
+    const handleARPress = async () => {
+        // Prefer GLB do item; se não houver, tentar usar modelo sintetizado do payload (totem) ou abrir a URL da marca
+        const brandKey = payload?.marca || payload?.nome_marca || payload?.nomeMarca || null;
+        const brandEntry = brandKey && payload?.anchorData && payload.anchorData.totem && payload.anchorData.totem.brands ? payload.anchorData.totem.brands[brandKey] : null;
+        const brandModel = brandEntry?.modelUrl || brandEntry?.model_url || null;
+        const brandUrl = brandEntry?.url || null;
+
+        const modelToOpen = glbUrl || brandModel;
+        if (modelToOpen) {
+            console.log('[CarouselCard] 🎯 Abrindo AR nativo com GLB:', modelToOpen);
+            try {
+                const sceneViewerUrl = `https://arvr.google.com/scene-viewer/1.2?file=${encodeURIComponent(modelToOpen)}&mode=ar_preferred`;
+                await Linking.openURL(sceneViewerUrl);
+                console.log('[CarouselCard] ✅ Scene Viewer aberto com sucesso!');
+            } catch (error) {
+                console.error('[CarouselCard] ❌ Erro ao abrir Scene Viewer:', error);
+            }
+            return;
+        }
+
+        if (brandUrl) {
+            console.log('[CarouselCard] ℹ️ Sem GLB — abrindo URL da marca como fallback:', brandUrl);
+            try { await Linking.openURL(brandUrl); } catch (e) { console.error('[CarouselCard] ❌ Erro abrindo brand URL:', e); }
+            return;
+        }
+
+        console.log('[CarouselCard] ❌ Nenhum GLB ou modelo disponível para este item');
+        Alert.alert('AR não disponível', 'Não há modelo 3D disponível para este item.');
+    };
+
+    return (
+        <View style={styles.carouselCard}>
+            <TouchableOpacity
+                style={styles.carouselImageContainer}
+                onPress={handleImagePress}
+                activeOpacity={0.8}
+            >
+                {(() => {
+                    const filename = item?.filename || item?.nome || String((imageUrl || '').split('/').pop());
+                    const localUri = headerLocalMap?.[filename];
+                    const src = localUri || item?.previewDataUrl || imageUrl;
+                    const isRemoteImg = typeof src === 'string' && (src.startsWith('http://') || src.startsWith('https://'));
+                    return (
+                        <Image
+                            source={{ uri: src }}
+                            style={styles.carouselImage}
+                            contentFit="cover"
+                            placeholder={item?.previewDataUrl || require('../assets/images/adaptive-icon.png')}
+                            transition={isRemoteImg ? 200 : 0}
+                        />
+                    );
+                })()}
+            </TouchableOpacity>
+
+            {/* Botão "Ver em AR" - só aparece se tiver GLB */}
+            {glbUrl && (
+                <TouchableOpacity
+                    style={styles.carouselARButton}
+                    onPress={handleARPress}
+                    activeOpacity={0.8}
+                >
+                    <Ionicons name="cube-outline" size={18} color="#fff" />
+                    <Text style={styles.carouselARButtonText}>Ver em AR</Text>
+                </TouchableOpacity>
+            )}
+        </View>
     );
 }
 
@@ -252,32 +601,38 @@ function CarouselBlock({ bloco }: { bloco: any }) {
                 </View>
             </TouchableOpacity>
 
-            {/* DRAWER COM CAROUSEL HORIZONTAL - EFEITO GLASS */}
-            <AnimatedBlurView
-                intensity={80}
-                tint="light"
-                style={[
-                    styles.carouselDrawer,
-                    {
-                        transform: [{ translateX }],
-                    },
-                ]}
-            >
-                {/* Carousel Horizontal com Cards */}
-                <ScrollView
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.carouselScroll}
-                    contentContainerStyle={styles.carouselScrollContent}
-                    snapToInterval={SCREEN_WIDTH * 0.7 + 16} // 70% da tela + marginRight
-                    decelerationRate="fast"
+            {/* DRAWER COM CAROUSEL HORIZONTAL - só renderiza quando aberto */}
+            {isOpen && (
+                <Animated.View
+                    style={[
+                        styles.carouselDrawer,
+                        {
+                            transform: [{ translateX }],
+                        },
+                    ]}
                 >
-                    {items.map((item: any, idx: number) => (
-                        <CarouselCard key={`carousel-${idx}`} item={item} index={idx} />
-                    ))}
-                </ScrollView>
-            </AnimatedBlurView>
+                    <BlurView
+                        intensity={80}
+                        tint="light"
+                        style={StyleSheet.absoluteFill}
+                        pointerEvents="none"
+                    />
+                    {/* Carousel Horizontal com Cards */}
+                    <ScrollView
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.carouselScroll}
+                        contentContainerStyle={styles.carouselScrollContent}
+                        snapToInterval={SCREEN_WIDTH * 0.7 + 16} // 70% da tela + marginRight
+                        decelerationRate="fast"
+                    >
+                        {items.map((item: any, idx: number) => (
+                            <CarouselCard key={`carousel-${idx}`} item={item} index={idx} />
+                        ))}
+                    </ScrollView>
+                </Animated.View>
+            )}
         </>
     );
 }
@@ -408,8 +763,22 @@ function ButtonBlock({ bloco }: { bloco: any }) {
 
     const [isOpen, setIsOpen] = React.useState(false); // Inicia FECHADO
     const translateY = React.useRef(new Animated.Value(300)).current; // Posição fechada
+    const [isAnimating, setIsAnimating] = React.useState(false); // Controla se está animando
+    const queuedToggleRef = React.useRef<boolean | null>(null);
+    const queuedPressRef = React.useRef<boolean>(false);
+
+    const performButtonAction = React.useCallback(() => {
+        console.log('[ButtonBlock] ▶ Executando ação do botão (performButtonAction)');
+        const url = action?.href;
+        if (url && typeof Linking !== 'undefined') {
+            Linking.openURL(url).catch((err) => {
+                console.error('[ButtonBlock] ❌ Erro ao abrir link:', err);
+            });
+        }
+    }, [action]);
 
     React.useEffect(() => {
+        setIsAnimating(true);
         Animated.spring(translateY, {
             toValue: isOpen ? 0 : 300,
             useNativeDriver: true,
@@ -417,17 +786,42 @@ function ButtonBlock({ bloco }: { bloco: any }) {
             friction: 8,
         }).start(() => {
             console.log('[ButtonBlock] ✅ Animação concluída, isOpen:', isOpen);
+            setIsAnimating(false);
+
+            // Se houve um toggle enfileirado durante a animação, processa primeiro
+            if (queuedToggleRef.current !== null) {
+                const desired = queuedToggleRef.current;
+                queuedToggleRef.current = null;
+                console.log('[ButtonBlock] ▶ Processando toggle enfileirado ->', desired);
+                // Executa o toggle agora (isso disparará nova animação)
+                setIsOpen(desired);
+                return; // aguarda próxima animação para possíveis queuedPress
+            }
+
+            // Se houve um clique no botão enfileirado, executa a ação
+            if (queuedPressRef.current) {
+                queuedPressRef.current = false;
+                console.log('[ButtonBlock] ▶ Processando clique enfileirado');
+                performButtonAction();
+            }
         });
-    }, [isOpen]);
+    }, [isOpen, performButtonAction]);
 
     return (
         <>
             {/* ABA FIXA NA BORDA INFERIOR */}
             <TouchableOpacity
                 style={styles.buttonTab}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 onPress={() => {
-                    console.log('[ButtonBlock] 📌 Aba clicada, isOpen atual:', isOpen);
-                    setIsOpen(!isOpen);
+                    if (isAnimating) {
+                        console.log('[ButtonBlock] ⏳ Aba clicada DURANTE animação — enfileirando toggle');
+                        // Enfileira o estado desejado para ser processado ao final da animação
+                        queuedToggleRef.current = !isOpen;
+                        return;
+                    }
+                    console.log('[ButtonBlock] 📌 Aba clicada, isOpen atual (toggle):', isOpen);
+                    setIsOpen((prev) => !prev);
                 }}
                 activeOpacity={0.8}
             >
@@ -437,16 +831,16 @@ function ButtonBlock({ bloco }: { bloco: any }) {
                 </View>
             </TouchableOpacity>
 
-            {/* BOTÃO ANIMADO - pointerEvents="box-none" permite toques passarem */}
+            {/* BOTÃO ANIMADO - sempre renderiza, mas só recebe toques quando aberto */}
             <Animated.View
-                pointerEvents="box-none"
+                pointerEvents={isOpen ? 'auto' : 'none'}
                 style={{
                     position: 'absolute',
-                    bottom: 30,
+                    bottom: TAB_BAR_HEIGHT + 16,
                     left: 20,
                     right: 20,
                     transform: [{ translateY }],
-                    zIndex: 100,
+                    zIndex: 1000,
                 }}
             >
                 <TouchableOpacity
@@ -455,12 +849,21 @@ function ButtonBlock({ bloco }: { bloco: any }) {
                         { backgroundColor }
                     ]}
                     activeOpacity={0.8}
-                    onPress={() => {
-                        console.log('[ButtonBlock] 🖱️ Botão PRESSIONADO!');
-                        const url = action?.href;
-                        if (url && url.startsWith('https://')) {
-                            Linking.openURL(url);
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    onPressIn={() => {
+                        if (isAnimating) {
+                            console.log('[ButtonBlock] ⏳ onPressIn durante animação — executando ação imediatamente');
+                            performButtonAction();
                         }
+                    }}
+                    onPress={() => {
+                        // onPress roda após onPressIn; a ação já pode ter sido disparada aí.
+                        if (isAnimating) {
+                            console.log('[ButtonBlock] ⏳ onPress detectado durante animação - ação possivelmente já executada');
+                            return;
+                        }
+                        console.log('[ButtonBlock] 🖱️ Botão PRESSIONADO!');
+                        performButtonAction();
                     }}
                 >
                     {!iconInvert && renderIcon()}
@@ -506,6 +909,32 @@ const styles = StyleSheet.create({
         maxHeight: 500, // Altura máxima para evitar imagens muito grandes
         backgroundColor: '#e0e0e0',
     },
+    headerImageContainer: {
+        position: 'relative',
+        width: '100%',
+    },
+    headerARButton: {
+        position: 'absolute',
+        bottom: 12,
+        right: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#3498db', // Azul padrão
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+    },
+    headerARButtonText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '600',
+        marginLeft: 4,
+    },
 
     // Texto
     textBlock: {
@@ -527,7 +956,7 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         color: '#444',
-        marginBottom: 12,
+        marginBottom: 8,
         lineHeight: 26,
     },
     textTitle: {
@@ -600,14 +1029,14 @@ const styles = StyleSheet.create({
     buttonTab: {
         position: 'absolute',
         backgroundColor: '#3498db',
-        bottom: 0,
+        bottom: TAB_BAR_HEIGHT,
         left: '25%', // Centralizado horizontalmente
         right: '25%', // 50% da largura da tela
         paddingVertical: 4,
         paddingHorizontal: 12,
         borderTopLeftRadius: 12,
         borderTopRightRadius: 12,
-        zIndex: 101, // Acima do carousel overlay (98) e drawer (99, 100
+        zIndex: 1001, // Bem acima de tudo
     },
     buttonTabHandle: {
         alignItems: 'center',
@@ -685,7 +1114,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 4,
         elevation: 5,
-        zIndex: 100,
+        zIndex: 500, // Acima do drawer do carousel (499), abaixo do botão (1001)
     },
     carouselTabHandle: {
         alignItems: 'center',
@@ -722,7 +1151,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 10,
-        zIndex: 99,
+        zIndex: 499, // Abaixo da aba do carousel (500), acima do conteúdo (0)
         overflow: 'hidden', // Importante para BlurView
         borderTopStartRadius: 12,
         borderBottomStartRadius: 12,
@@ -753,11 +1182,38 @@ const styles = StyleSheet.create({
         shadowRadius: 6,
         elevation: 4,
         height: SCREEN_WIDTH * 0.7, // Altura igual à largura (quadrado)
+        position: 'relative', // Permite posicionar botão AR absolutamente
+    },
+    carouselImageContainer: {
+        width: '100%',
+        height: '100%',
     },
     carouselImage: {
         width: '100%',
         height: '100%', // Preenche todo o card
         backgroundColor: '#e0e0e0',
+    },
+    carouselARButton: {
+        position: 'absolute',
+        bottom: 12,
+        right: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#3498db', // Azul padrão (mesmo do carousel tab)
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+    },
+    carouselARButtonText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '600',
+        marginLeft: 4,
     },
 
     // Bloco desconhecido

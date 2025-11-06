@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useARPayload } from '@/context/ARPayloadContext';
 import { API_CONFIG } from '../config/api';
 import { getCachedContent, saveCachedContent, cleanExpiredCache } from '../utils/contentCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -47,6 +48,17 @@ export function useARContent() {
   const [conteudo, setConteudo] = useState<ARBlock | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // acessar função de prefetch do contexto para iniciar downloads já na fase de busca
+  // Chamamos o hook no topo da função (sempre) e protegemos com try/catch
+  // caso não exista provider no ambiente de teste.
+  let prefetchImagesForPayload: ((p: any) => void) | undefined = undefined;
+  try {
+    // useARPayload é um hook; chamamos sem condicionais
+    const ctx = useARPayload();
+    prefetchImagesForPayload = ctx?.prefetchImagesForPayload;
+  } catch (e) {
+    // se não houver provider disponível (ex: testes), apenas ignoramos
+  }
 
   async function fetchSmartContent(nome_marca: string, lat: number, lon: number) {
     try {
@@ -163,6 +175,8 @@ export function useARContent() {
       console.log(`[useARContent] ⚡ Smart content: ${((performance.now() - smartStart) / 1000).toFixed(2)}s`);
 
       if (smartResult && smartResult.conteudo) {
+        // iniciar prefetch de imagens o quanto antes (não bloqueante)
+        try { prefetchImagesForPayload && prefetchImagesForPayload(smartResult); } catch (e) { }
         await saveCachedContent(nome_marca, lat, lon, smartResult);
         console.log(`[useARContent] ⏱️ Total: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
         setConteudo(smartResult.conteudo);
@@ -178,6 +192,7 @@ export function useARContent() {
       console.log(`[useARContent] ⏱️ Consulta helper: ${((performance.now() - consultaStart) / 1000).toFixed(2)}s`);
 
       if (consulta && consulta.conteudo) {
+        try { prefetchImagesForPayload && prefetchImagesForPayload(consulta); } catch (e) { }
         await saveCachedContent(nome_marca, lat, lon, consulta);
         console.log(`[useARContent] ⏱️ Total: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
         setConteudo(consulta.conteudo);
@@ -194,6 +209,7 @@ export function useARContent() {
         console.log(`[useARContent] ⏱️ Radius ${r}m: ${((performance.now() - radiusStart) / 1000).toFixed(2)}s`);
 
         if (resp && resp.conteudo) {
+          try { prefetchImagesForPayload && prefetchImagesForPayload(resp); } catch (e) { }
           await saveCachedContent(nome_marca, lat, lon, resp);
           console.log(`[useARContent] ⏱️ Total: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
           setConteudo(resp.conteudo);
@@ -226,6 +242,7 @@ export function useARContent() {
             console.log(`[useARContent] ⏱️ Region ${it.t}/${it.v}: ${((performance.now() - regionStart) / 1000).toFixed(2)}s`);
 
             if (regionResp && regionResp.blocos && regionResp.blocos.length) {
+              try { prefetchImagesForPayload && prefetchImagesForPayload(regionResp); } catch (e) { }
               const normalized = { conteudo: regionResp.blocos, nome_regiao: regionResp.nome_regiao, tipo_regiao: regionResp.tipo_regiao };
               await saveCachedContent(nome_marca, lat, lon, normalized);
               console.log(`[useARContent] ⏱️ Total: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);

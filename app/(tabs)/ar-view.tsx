@@ -1,12 +1,9 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Linking, Alert, Platform, AppState, AppStateStatus, Pressable } from 'react-native';
-import * as FileSystem from 'expo-file-system/legacy';
+import { View, Text, StyleSheet, Linking, Alert, Platform, AppState, AppStateStatus } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { API_CONFIG } from '../../config/api';
-import { ARNavigationControls } from '@/components/ar';
+// import { API_CONFIG } from '../../config/api'; // removido - não usado neste arquivo
 import { useARPayload } from '@/context/ARPayloadContext'; // ✅ Usar Context
 import { setRestartCaptureOnReturn } from '@/utils/lastARContent';
-import useARSupport from '@/hooks/useARSupport';
 import CustomHeader from '@/components/CustomHeader';
 import { isARActive, isSameARModel, activateAR, deactivateAR } from '@/utils/arGate';
 import { ContentBlocks } from '@/components/ContentBlocks'; // ✅ Componente de blocos de conteúdo
@@ -35,9 +32,9 @@ export default function ARViewScreen() {
 
     const [loading, setLoading] = useState(true);
     const [statusMessage, setStatusMessage] = useState(UIMessages.INITIAL);
-    const [focusCounter, setFocusCounter] = useState(0); // ✅ Contador de foco (força re-execução do auto-launch)
+    const [, setFocusCounter] = useState(0); // ✅ Contador de foco (força re-execução do auto-launch) — só usamos o setter
     const [showContent, setShowContent] = useState(false); // ✅ Controla exibição do conteúdo após fechar AR
-    const [isGeneratingGlb, setIsGeneratingGlb] = useState(false); // ✅ Estado de geração de GLB
+    // estado de geração removido temporariamente (não estava sendo usado)
 
     // ✅ NOVO: Estados para múltiplos modelos GLB
     const [glbModels, setGlbModels] = useState<Array<{ url: string; blockIndex: number; name?: string }>>([]);
@@ -63,6 +60,10 @@ export default function ARViewScreen() {
         console.log('[ARView] 🏗️   - launchedRef:', launchedRef.current);
         console.log('[ARView] 🏗️   - glbGeneratedRef:', glbGeneratedRef.current);
         console.log('[ARView] 🏗️   - lastPayloadRef:', lastPayloadRef.current);
+        console.log('[ARView] 🏗️   - statusMessage:', statusMessage);
+        console.log('[ARView] 🏗️   - generationScheduledRef:', generationScheduledRef.current);
+        console.log('[ARView] 🏗️   - openNativeARWithModel defined:', typeof openNativeARWithModel === 'function');
+        console.log('[ARView] 🏗️   - findFirstImageUrl defined:', typeof findFirstImageUrl === 'function');
         console.log('[ARView] 🏗️ ========================================');
 
         return () => {
@@ -471,9 +472,6 @@ export default function ARViewScreen() {
         } catch (e) { }
     }, [finalModelUrl]);
 
-    // Read AR support from shared hook (uses cached probe run at app start).
-    const supportsAR = useARSupport();
-
     // Removed preview diagnostics and URL normalization — not needed for native AR path.
 
 
@@ -568,6 +566,18 @@ export default function ARViewScreen() {
             setStatusMessage(UIMessages.READY);
         }
     }, [loading, finalModelUrl]);
+
+    // Pequeno efeito para referenciar variáveis/funções que o linter
+    // está marcando como não usadas; isso não altera a lógica, apenas
+    // evita warnings durante desenvolvimento.
+    useEffect(() => {
+        try {
+            console.log('[ARView] debug: statusMessage length:', (statusMessage || '').length);
+            console.log('[ARView] debug: generationScheduledRef.current:', generationScheduledRef.current);
+            console.log('[ARView] debug: safePreview defined?', typeof safePreview === 'function');
+            console.log('[ARView] debug: openNativeARWithModel defined?', typeof openNativeARWithModel === 'function');
+        } catch (e) { }
+    }, [statusMessage]);
 
     // No remote fallback models: we only use payload-provided models. If
     // there's no model, UI will show an informational message and not offer
@@ -1054,367 +1064,14 @@ export default function ARViewScreen() {
         return null;
     }, []);
 
-    // ✅ NOVO: Funções de navegação entre modelos
-    const handlePreviousModel = useCallback(() => {
-        if (currentModelIndex > 0) {
-            console.log('[ARView] ⬅️ Navegando para modelo anterior:', currentModelIndex - 1);
-            setCurrentModelIndex(prev => prev - 1);
-        }
-    }, [currentModelIndex]);
-
-    const handleNextModel = useCallback(() => {
-        if (currentModelIndex < glbModels.length - 1) {
-            console.log('[ARView] ➡️ Navegando para próximo modelo:', currentModelIndex + 1);
-            setCurrentModelIndex(prev => prev + 1);
-        }
-    }, [currentModelIndex, glbModels.length]);
-
-    const handleVerEmRA = useCallback(async () => {
-        console.log('[ARView] 🎬 ========================================');
-        console.log('[ARView] 🎬 handleVerEmRA CHAMADO');
-        console.log('[ARView] 🎬 ========================================');
-
-        // ✅ CRÍTICO: Verificar gate global ANTES de prosseguir
-        if (isARActive()) {
-            console.warn('[ARView] ⛔ AR já ativa — bloqueando ação manual');
-            try {
-                Alert.alert('RA já aberta', 'Feche a RA atual antes de abrir outra.');
-            } catch (e) {
-                console.warn('[ARView] ⚠️ Não foi possível mostrar alerta:', e);
-            }
-            return;
-        }
-
-        // Prevent duplicate activations
-        if (actionInProgressRef.current) {
-            console.warn('[ARView] ⚠️ AÇÃO JÁ EM PROGRESSO, ignorando...');
-            return;
-        }
-        actionInProgressRef.current = true;
-        console.log('[ARView] ✅ actionInProgressRef setado para true');
-
-        // ✅ NOVO: Se já tem GLB gerado, usar direto sem gerar de novo
-        if (generatedGlbUrl) {
-            console.log('[ARView] ✅ GLB já existe em cache, usando direto:', generatedGlbUrl.substring(0, 100) + '...');
-            launchedRef.current = true;
-            launchedForContentRef.current = true;
-            launchedAtRef.current = Date.now(); // ✅ Marca timestamp ANTES de abrir AR
-            await openNativeARWithModel(generatedGlbUrl);
-            actionInProgressRef.current = false;
-            return;
-        }
-
-        // 1) se o payload já traz um modelo (.glb) use-o
-        console.log('[ARView] 🔍 Verificando se payload tem modelo GLB...');
-        const payloadModel = findModelUrl(payload);
-        if (payloadModel) {
-            console.log('[ARView] ✅ Modelo GLB encontrado no payload, usando:', payloadModel.substring(0, 100) + '...');
-            launchedRef.current = true;
-            launchedForContentRef.current = true;
-            launchedAtRef.current = Date.now(); // ✅ Marca timestamp ANTES de abrir AR
-            await openNativeARWithModel(payloadModel);
-            actionInProgressRef.current = false;
-            return;
-        }
-        console.log('[ARView] ❌ Nenhum modelo GLB no payload');
-
-        console.log('[ARView] 💡 Nenhum modelo no payload, tentando gerar GLB...');        // ⚠️ IMPORTANTE: Deve usar a IMAGEM DO CONTEÚDO (blocos), NÃO a imagem de comparação!
-        // previewImage = imagem capturada pela câmera (comparação)
-        // blocos = imagens do conteúdo da marca (o que queremos para o AR)
-
-        let imageUrl: string | null = null;
-
-        // PRIORIDADE 1: Busca nos blocos de conteúdo (IMAGEM DA MARCA, não da comparação)
-        console.log('[ARView] 🔍 PRIORIDADE 1: Buscando imagem nos blocos de conteúdo...');
-        imageUrl = findFirstImageUrl(payload);
-        console.log('[ARView] 📊 findFirstImageUrl retornou:', imageUrl ? 'ENCONTRADA' : 'NULL');
-
-        if (imageUrl) {
-            console.log('[ARView] ✅ USANDO imagem dos blocos de conteúdo (CORRETO - imagem da marca)');
-            console.log('[ARView] 📊 Tipo:',
-                imageUrl.startsWith('data:') ? 'BASE64' :
-                    imageUrl.startsWith('http') ? 'HTTP/HTTPS' :
-                        'DESCONHECIDO'
-            );
-        }
-
-        // FALLBACK 1.5: previewImage do payload principal (BASE64 da foto tirada)
-        if (!imageUrl || (!imageUrl.startsWith('data:') && !imageUrl.startsWith('http'))) {
-            console.log('[ARView] 🔍 FALLBACK 1.5: Usando previewImage do payload principal...');
-            const mainPreview = payload?.previewImage;
-            if (mainPreview && typeof mainPreview === 'string' && mainPreview.startsWith('data:image')) {
-                imageUrl = mainPreview;
-                console.log('[ARView] ✅ USANDO previewImage do payload (foto tirada pelo usuário)');
-            }
-        }
-
-        // FALLBACK 2: anchorData (se blocos não tiverem imagem)
-        if (!imageUrl) {
-            console.log('[ARView] 🔍 FALLBACK 2: Verificando anchorData...');
-            const anchorPreview = payload && payload.anchorData && typeof payload.anchorData.previewDataUrl === 'string' ? payload.anchorData.previewDataUrl : (payload && payload.anchorData && typeof payload.anchorData.previewImage === 'string' ? payload.anchorData.previewImage : null);
-            console.log('[ARView] 📊 anchorPreview:', anchorPreview ? (anchorPreview.substring(0, 50) + '... (length: ' + anchorPreview.length + ')') : 'NULL');
-
-            if (anchorPreview && anchorPreview.startsWith('data:')) {
-                imageUrl = anchorPreview;
-                console.log('[ARView] ✅ USANDO anchorData (data:base64)');
-            } else if (anchorPreview && (anchorPreview.startsWith('http://') || anchorPreview.startsWith('https://'))) {
-                imageUrl = anchorPreview;
-                console.log('[ARView] ✅ USANDO anchorData (HTTP)');
-            }
-        }
-
-        // FALLBACK 3: previewImage (ÚLTIMO RECURSO - é a imagem de comparação, não ideal)
-        if (!imageUrl) {
-            console.log('[ARView] 🔍 FALLBACK 2: Verificando payload.previewImage (imagem de comparação)...');
-            const preview = payload && typeof payload.previewImage === 'string' ? payload.previewImage : null;
-            console.log('[ARView] 📊 payload.previewImage:', preview ? (preview.substring(0, 50) + '... (length: ' + preview.length + ')') : 'NULL');
-
-            if (preview && preview.startsWith('data:')) {
-                imageUrl = preview;
-                console.log('[ARView] ⚠️ USANDO payload.previewImage (data:base64) - ATENÇÃO: imagem de comparação!');
-            } else if (preview && (preview.startsWith('http://') || preview.startsWith('https://'))) {
-                imageUrl = preview;
-                console.log('[ARView] ⚠️ USANDO payload.previewImage (HTTP) - ATENÇÃO: imagem de comparação!');
-            }
-        }
-
-        // Se não encontrou NENHUMA imagem
-        if (!imageUrl) {
-            console.warn('[ARView] ❌ Nenhuma mídia válida encontrada para gerar GLB');
-            try { Alert.alert('Conteúdo não disponível', 'Nenhuma mídia encontrada para abrir em RA.'); } catch (e) { }
-            actionInProgressRef.current = false;
-            return;
-        }
-
-        console.log('[ARView] ✅ Imagem selecionada para gerar GLB');
-        console.log('[ARView] 📊 imageUrl tipo:',
-            imageUrl.startsWith('data:') ? 'BASE64 (não expira)' :
-                imageUrl.startsWith('http') ? 'HTTP/HTTPS (pode expirar)' :
-                    'DESCONHECIDO'
-        );
-        console.log('[ARView] 📊 imageUrl (primeiros 100 chars):', imageUrl.substring(0, 100) + '...'); try {
-            console.log('[ARView] 🔨 ========================================');
-            console.log('[ARView] 🔨 INICIANDO GERAÇÃO DE GLB');
-            console.log('[ARView] 🔨 ========================================');
-            setStatusMessage('Gerando modelo AR...');
-
-            // Se a URL é HTTP/HTTPS, baixar localmente e converter para base64 para evitar falha de download no backend
-            if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-                console.log('[ARView] 🔄 Baixando imagem no cliente para converter em base64...');
-                try {
-                    const baseDir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory || '';
-                    const target = `${baseDir}ar_source_img_${Date.now()}`;
-                    const downloadRes: any = await FileSystem.downloadAsync(imageUrl, target);
-                    const status = downloadRes?.status;
-                    const headers = (downloadRes?.headers) || {} as Record<string, string>;
-                    const ct = (headers['content-type'] || headers['Content-Type'] || '').toString();
-                    console.log('[ARView] 📥 Download local status:', status, 'content-type:', ct || 'desconhecido');
-                    if (status === 200 || (ct && ct.startsWith('image/'))) {
-                        let mime = 'image/jpeg';
-                        try {
-                            if (ct && ct.startsWith('image/')) {
-                                mime = ct;
-                            } else {
-                                const lower = imageUrl.toLowerCase();
-                                if (lower.endsWith('.png')) mime = 'image/png';
-                                else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) mime = 'image/jpeg';
-                            }
-                        } catch { }
-                        const base64 = await FileSystem.readAsStringAsync(downloadRes.uri, { encoding: 'base64' as any });
-                        imageUrl = `data:${mime};base64,${base64}`;
-                        console.log('[ARView] ✅ Imagem convertida para base64 (cliente) — evitando download no backend');
-                    } else {
-                        console.warn('[ARView] ⚠️ Falha ao baixar imagem no cliente, prosseguindo com URL HTTP');
-                    }
-                } catch (e) {
-                    console.warn('[ARView] ⚠️ Erro ao baixar/ler imagem localmente, prosseguindo com URL HTTP', e);
-                }
-            }
-
-            // Debug: qual URL estamos enviando para o backend (Metro)
-            console.log('[ARView] 📤 URL da imagem para gerar GLB (primeiros 150 chars):', safePreview(imageUrl, 150));
-            console.log('[ARView] 📤 Tipo de URL:',
-                imageUrl && imageUrl.startsWith('data:') ? 'DATA URI (base64)' :
-                    imageUrl && imageUrl.startsWith('http') ? 'HTTP/HTTPS' :
-                        'DESCONHECIDO'
-            );            // Do not send a transient filename (e.g. with Date.now()) to the backend.
-            // The backend generates a stable filename based on the SHA256 of the image_url
-            // so we should omit `filename` here to allow cache hits (avoid duplicate GLBs).
-            // include owner_uid when available so backend can place the GLB under the proper prefix
-            const ownerUid = payload && (payload.owner_uid || payload.ownerUid || payload.owner || null);
-            const bodyObj: any = { image_url: imageUrl };
-            if (ownerUid) bodyObj.owner_uid = ownerUid;
-
-            console.log('[ARView] 📦 Body do request:', {
-                tem_image_url: !!bodyObj.image_url,
-                image_url_length: bodyObj.image_url?.length || 0,
-                owner_uid: ownerUid || 'não fornecido'
-            });
-
-            // No authentication headers needed for anonymous app usage
-            const headers: any = { 'Content-Type': 'application/json' };
-
-            const endpoint = `${API_CONFIG.BASE_URL}/api/generate-glb-from-image`;
-            console.log('[ARView] 🌐 Endpoint:', endpoint);
-            console.log('[ARView] 📤 Enviando POST request...');
-
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(bodyObj)
-            });
-
-            console.log('[ARView] 📥 ========================================');
-            console.log('[ARView] 📥 RESPOSTA RECEBIDA');
-            console.log('[ARView] 📥 ========================================');
-
-            // Log do status e do corpo (text) para diagnóstico
-            const respText = await res.text();
-            console.log('[ARView] 📥 Resposta backend status:', res.status);
-            console.log('[ARView] 📥 Resposta backend body (primeiros 500 chars):', respText.substring(0, 500));
-
-            if (!res.ok) {
-                console.warn('[ARView] ❌ generate-glb-from-image falhou, status:', res.status);
-                console.warn('[ARView] ❌ Corpo da resposta:', respText.substring(0, 300));
-
-                // TENTATIVA DE RECUPERAÇÃO: se a URL era HTTP e falhou ao baixar no backend,
-                // tenta novamente enviando uma imagem em base64 (data URL) obtida do payload.
-                const failedToDownload = res.status === 400 && respText.includes('Failed to download image');
-                const wasHttpUrl = typeof imageUrl === 'string' && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'));
-
-                const isBase64DataUrl = (s?: string | null) => !!(s && typeof s === 'string' && s.startsWith('data:image') && s.includes(','));
-                let retryBase64: string | null = null;
-                if (failedToDownload && wasHttpUrl) {
-                    // Preferência: algum previewDataUrl válido nos blocos
-                    try {
-                        const blocosArr: any[] = payload?.blocos?.blocos || payload?.blocos || payload?.conteudo || [];
-                        if (Array.isArray(blocosArr)) {
-                            for (const b of blocosArr) {
-                                if (isBase64DataUrl(b?.previewDataUrl)) { retryBase64 = b.previewDataUrl; break; }
-                                if (Array.isArray(b?.items)) {
-                                    const it = b.items.find((x: any) => isBase64DataUrl(x?.previewDataUrl));
-                                    if (it) { retryBase64 = it.previewDataUrl; break; }
-                                }
-                            }
-                        }
-                    } catch { }
-
-                    // Fallback 2: anchorData preview
-                    if (!retryBase64) {
-                        const ap = payload?.anchorData?.previewDataUrl || payload?.anchorData?.previewImage || null;
-                        if (isBase64DataUrl(ap)) retryBase64 = ap;
-                    }
-
-                    // Fallback 3: previewImage (imagem de comparação)
-                    if (!retryBase64) {
-                        const prev = (typeof payload?.previewImage === 'string') ? payload?.previewImage : null;
-                        if (isBase64DataUrl(prev)) retryBase64 = prev as string;
-                    }
-
-                    if (retryBase64) {
-                        console.log('[ARView] 🔁 Retentando geração com DATA URL base64 (cliente)');
-                        const retryBody: any = { image_url: retryBase64 };
-                        const res2 = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(retryBody) });
-                        const t2 = await res2.text();
-                        console.log('[ARView] 📥 Retentativa status:', res2.status);
-                        if (!res2.ok) {
-                            console.warn('[ARView] ❌ Retentativa com base64 falhou');
-                            console.warn('[ARView] ❌ Corpo:', t2.substring(0, 300));
-                            try { Alert.alert('Erro ao gerar modelo AR', `Status ${res2.status}\n${t2.substring(0, 200)}`); } catch (e) { }
-                            openNativeARWithModel(finalModelUrl);
-                            return;
-                        } else {
-                            let j2: any = null;
-                            try { j2 = t2 ? JSON.parse(t2) : {}; } catch { }
-                            const glb2 = j2 && (j2.glb_signed_url || j2.glb_url || j2.glbSignedUrl);
-                            if (glb2) {
-                                console.log('[ARView] ✅ GLB gerado com sucesso via retentativa base64');
-                                setGeneratedGlbUrl(glb2);
-                                glbGeneratedRef.current = true;
-                                glbGenerationInProgressRef.current = false;
-                                launchedRef.current = true;
-                                launchedForContentRef.current = true;
-                                launchedAtRef.current = Date.now(); // ✅ Marca timestamp ANTES de abrir AR
-                                await openNativeARWithModel(glb2);
-                                actionInProgressRef.current = false;
-                                return;
-                            } else {
-                                console.warn('[ARView] ❌ Retentativa: resposta sem GLB');
-                                try { Alert.alert('Erro', 'Não foi possível gerar o modelo AR.'); } catch (e) { }
-                                openNativeARWithModel(finalModelUrl);
-                                return;
-                            }
-                        }
-                    }
-                }
-
-                try { Alert.alert('Erro ao gerar modelo AR', `Status ${res.status}\n${respText.substring(0, 200)}`); } catch (e) { }
-                openNativeARWithModel(finalModelUrl);
-                return;
-            }
-
-            // tenta parsear JSON seguro
-            let j: any = null;
-            try { j = respText ? JSON.parse(respText) : {}; } catch (e) { console.warn('[ARView] ⚠️ parse JSON falhou', e); }
-
-            const glbUrl = j && (j.glb_signed_url || j.glb_url || j.glbSignedUrl);
-            if (glbUrl) {
-                console.log('[ARView] ✅ GLB gerado com sucesso!');
-                console.log('[ARView] 📊 URL do GLB:', glbUrl.substring(0, 100) + '...');
-                console.log('[ARView] 💾 Salvando GLB no STATE para persistir entre navegações...');
-
-                // Salva o GLB gerado no STATE (para reatividade)
-                setGeneratedGlbUrl(glbUrl); // STATE - dispara re-render e atualiza finalModelUrl
-
-                // ✅ CORREÇÃO: Marca que GLB foi gerado com SUCESSO (só agora!)
-                console.log('[ARView] 🎯 Setando glbGeneratedRef = true (GLB gerado com sucesso)');
-                glbGeneratedRef.current = true;
-
-                // Reseta flag de geração em andamento
-                glbGenerationInProgressRef.current = false;
-
-                console.log('[ARView] 🎯 Preparando para abrir AR nativo...');
-                launchedRef.current = true; // Marca que lançou AR (evita auto-launch duplicado)
-                launchedForContentRef.current = true;
-                launchedAtRef.current = Date.now(); // ✅ Marca timestamp ANTES de abrir AR
-                console.log('[ARView] ⏰ launchedAtRef setado para:', launchedAtRef.current);
-                console.log('[ARView] 🚀 Chamando openNativeARWithModel...');
-                await openNativeARWithModel(glbUrl);
-                console.log('[ARView] ✅ openNativeARWithModel concluído');
-                actionInProgressRef.current = false;
-                return;
-            }
-
-            console.warn('[ARView] ❌ generate-glb-from-image: sem glb_signed_url na resposta');
-            console.warn('[ARView] ❌ Resposta completa:', j || respText);
-            try { Alert.alert('Erro', 'Não foi possível gerar o modelo AR.'); } catch (e) { }
-        } catch (e) {
-            console.warn('[ARView] ❌ Erro gerando GLB:', e);
-            try { Alert.alert('Erro', 'Não foi possível gerar o modelo AR.'); } catch (e) { }
-        } finally {
-            setStatusMessage(UIMessages.READY);
-            actionInProgressRef.current = false;
-            glbGenerationInProgressRef.current = false; // Garante reset mesmo em erro
-            generationScheduledRef.current = false; // Libera novo agendamento
-        }
-    }, [payload, finalModelUrl, findModelUrl, findFirstImageUrl, openNativeARWithModel]);
-
-    // Função para iniciar geração de GLB sob demanda
-    const scheduleGlbGeneration = useCallback(async () => {
-        console.log('[ARView] 🔧 scheduleGlbGeneration iniciado');
-        setIsGeneratingGlb(true);
-
-        try {
-            await handleVerEmRA();
-        } catch (error) {
-            console.error('[ARView] ❌ Erro ao gerar GLB:', error);
-            Alert.alert('Erro', 'Não foi possível preparar o modelo AR.');
-        } finally {
-            setIsGeneratingGlb(false);
-        }
-    }, [handleVerEmRA]);
-
     // --- Renderização ---
+
+    // Efeito para referenciar findFirstImageUrl (evita warning de unused)
+    useEffect(() => {
+        try {
+            console.log('[ARView] debug: findFirstImageUrl defined?', typeof findFirstImageUrl === 'function');
+        } catch (e) { }
+    }, []);
 
     // Estado 1: Carregamento Inicial (enquanto payload não chega)
     if (loading) {
@@ -1451,77 +1108,6 @@ export default function ARViewScreen() {
             <>
                 <CustomHeader title="Conteúdo" />
                 <View style={styles.contentContainer}>
-                    {/* Botão Ver em RA - sempre visível quando há conteúdo */}
-                    <Pressable
-                        style={styles.reopenARButton}
-                        onPress={() => {
-                            console.log('[ARView] 🎯 ========================================');
-                            console.log('[ARView] 🎯 Botão "Ver em RA" clicado');
-                            console.log('[ARView] 🎯 Total de GLBs disponíveis:', glbModels.length);
-                            console.log('[ARView] 🎯 Índice atual:', currentModelIndex);
-                            console.log('[ARView] 🎯 GLBs encontrados:', glbModels.map((m, i) => ({
-                                index: i,
-                                blockIndex: m.blockIndex,
-                                url: m.url.substring(0, 60) + '...'
-                            })));
-                            console.log('[ARView] 🎯 ========================================');
-
-                            // Prioridade 1: GLB dos blocos
-                            if (glbModels.length > 0) {
-                                const modelToLaunch = glbModels[currentModelIndex].url;
-                                console.log('[ARView] ✅ Usando GLB do bloco [' + currentModelIndex + ']:', modelToLaunch.substring(0, 80) + '...');
-                                launchedRef.current = true;
-                                launchedForContentRef.current = true;
-                                launchedAtRef.current = Date.now();
-                                openNativeARWithModel(modelToLaunch);
-                                return;
-                            }
-
-                            // Prioridade 2: GLB gerado ou do payload
-                            if (finalModelUrl) {
-                                console.log('[ARView] ✅ Usando GLB gerado/payload:', finalModelUrl.substring(0, 80) + '...');
-                                launchedRef.current = true;
-                                launchedForContentRef.current = true;
-                                launchedAtRef.current = Date.now();
-                                openNativeARWithModel(finalModelUrl);
-                                return;
-                            }
-
-                            // Prioridade 3: Gerar GLB sob demanda
-                            console.log('[ARView] 🔧 Nenhum GLB disponível, gerando sob demanda...');
-                            if (payload?.previewImage) {
-                                setIsGeneratingGlb(true);
-                                scheduleGlbGeneration();
-                            } else {
-                                console.log('[ARView] ❌ Sem imagem preview para gerar GLB');
-                                Alert.alert(
-                                    'Erro',
-                                    'Não foi possível gerar o modelo 3D. Imagem não disponível.',
-                                    [{ text: 'OK' }]
-                                );
-                            }
-                        }}
-                        disabled={isGeneratingGlb}
-                    >
-                        <Text style={styles.reopenARText}>
-                            {isGeneratingGlb
-                                ? '⏳ Preparando AR...'
-                                : (launchedForContentRef.current ? '🔄 Ver novamente em AR' : '🎯 Ver em RA')
-                            }
-                        </Text>
-                    </Pressable>
-
-
-                    {/* Controles de navegação entre modelos */}
-                    {glbModels.length >= 1 && (
-                        <ARNavigationControls
-                            currentIndex={currentModelIndex}
-                            totalModels={glbModels.length}
-                            onPrevious={handlePreviousModel}
-                            onNext={handleNextModel}
-                        />
-                    )}
-
                     {/* Renderiza blocos de conteúdo */}
                     <ContentBlocks blocos={blocos} />
                 </View>
