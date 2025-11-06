@@ -39,7 +39,7 @@ export default function HelpScreen() {
             if (granted && open) {
                 setOpen(false);
                 if (openedFromParams.current) {
-                    try { router.replace('/(tabs)/help'); } catch (e) { }
+                    try { router.replace('/_tabs/help'); } catch (e) { }
                     openedFromParams.current = false;
                 }
             }
@@ -70,7 +70,7 @@ export default function HelpScreen() {
                     const next = !open;
                     setOpen(next);
                     if (!next && openedFromParams.current) {
-                        try { router.replace('/(tabs)/help'); } catch (e) { }
+                        try { router.replace('/_tabs/help'); } catch (e) { }
                         openedFromParams.current = false;
                     }
                 }} style={styles.accordionHeader} accessibilityRole="button">
@@ -85,7 +85,7 @@ export default function HelpScreen() {
                         <Text style={styles.accordionText}><Text style={[styles.itens, focus === 'location' && styles.bold]}>• Localização</Text>: é usada única e exclusivamente para localizar conteúdos AR próximos e melhorar resultados.</Text>
                         <Text style={styles.accordionText}><Text style={[styles.itens, focus === 'camera' && styles.bold]}>• Câmera</Text>: necessária para capturar imagens e reconhecer logomarcas. Sem permitir acesso à câmera você não poderá acessar a tela de captura nem a tela de explorar o ambiente.</Text>
                         <Text style={styles.accordionText}><Text style={[styles.itens, focus === 'gallery' && styles.bold]}>• Galeria</Text>: necessária para selecionar imagens já existentes, salvar capturas temporárias e enviar imagens ao servidor para reconhecimento. O app nunca expõe credenciais de armazenamento — usamos URLs assinadas geradas pelo nosso backend para transfers seguras.</Text>
-                        <Pressable style={styles.openOptions} onPress={() => router.push('/(tabs)/recognizer')}>
+                        <Pressable style={styles.openOptions} onPress={() => router.push('/_tabs/recognizer')}>
                             <Text style={styles.openOptionsText}>Ir para Captura</Text>
                         </Pressable>
                     </View>

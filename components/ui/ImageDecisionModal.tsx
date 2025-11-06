@@ -64,7 +64,7 @@ export function ImageDecisionModal({
                         Alert.alert('Permissão necessária', 'Preciso da sua localização para buscar conteúdo próximo. Vá até a tela de captura e conceda a permissão.');
                         setLoading(false);
                         onCancel();
-                        router.push('/(tabs)/recognizer');
+                        router.push('/_tabs/recognizer');
                         return;
                     } else {
                         console.log('[ImageDecisionModal] 📍 Obtendo localização atual...');
@@ -315,7 +315,7 @@ export function ImageDecisionModal({
                             setARPayload(payload);
                             // Fecha o modal ANTES de navegar
                             shouldCancel = true; // vai executar onCancel no finally
-                            router.push('/(tabs)/ar-view');
+                            router.push('/_tabs/ar-view');
                         } else {
                             // No content for recognized brand: show the no-content modal with brand and location
                             console.warn('[ImageDecisionModal] ⚠️ Marca reconhecida mas sem conteúdo disponível');

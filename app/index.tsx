@@ -26,7 +26,7 @@ export default function Splash() {
                         duration: 600,
                         useNativeDriver: true,
                     }).start(() => {
-                        router.replace("/(tabs)/recognizer");
+                        router.replace("/_tabs/recognizer");
                     });
                     return 100;
                 }

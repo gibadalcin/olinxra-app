@@ -37,7 +37,7 @@ function PermissionRequest({ onRequestPermission }: PermissionRequestProps) {
             </View>
             <View style={[styles.buttonWrapper, styles.buttonSpacing]}>
                 <Button
-                    onPress={() => router.replace('/(tabs)/help?open=permissions')}
+                    onPress={() => router.replace('/_tabs/help?open=permissions')}
                     title="Negar Permissão"
                 />
             </View>

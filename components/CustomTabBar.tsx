@@ -8,10 +8,10 @@ import { ThemedText } from "./ThemedText";
 import { Colors } from "@/constants/Colors";
 
 const icons = [
-    { name: "camera", label: "Capturar", route: "/(tabs)/recognizer", family: Ionicons },
-    { name: "magnify-expand", label: "Explorar", route: "/(tabs)/explorer", family: MaterialCommunityIcons },
-    { name: "help-circle", label: "Ajuda", route: "/(tabs)/help", family: Ionicons },
-    { name: "settings", label: "Opções", route: "/(tabs)/options", family: Ionicons },
+    { name: "camera", label: "Capturar", route: "/_tabs/recognizer", family: Ionicons },
+    { name: "magnify-expand", label: "Explorar", route: "/_tabs/explorer", family: MaterialCommunityIcons },
+    { name: "help-circle", label: "Ajuda", route: "/_tabs/help", family: Ionicons },
+    { name: "settings", label: "Opções", route: "/_tabs/options", family: Ionicons },
 ];
 
 const activeColor = Colors.global.blueDark;
@@ -42,7 +42,7 @@ export default function CustomTabBar({ state }: { state: NavigationState }) {
         >
             {icons.map((icon) => {
                 const routeSegment = icon.route.split("/").filter(Boolean).pop();
-                const isActive = (icon.route === "/(tabs)/" && activeRoute === "index") || activeRoute === routeSegment;
+                const isActive = (icon.route === "/_tabs/" && activeRoute === "index") || activeRoute === routeSegment;
 
                 // Tabs are always enabled; the Recognizer screen handles permission checks itself.
                 const disabledForCamera = false;
