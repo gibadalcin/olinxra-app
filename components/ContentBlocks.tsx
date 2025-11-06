@@ -442,9 +442,10 @@ function TextBlock({ bloco }: { bloco: any }) {
         return null;
     }
 
-    // Detectar hierarquia: título > subtítulo > texto normal
-    const isTitulo = tipo.includes('título') || tipo.includes('titulo');
+    // Detectar hierarquia: SUBTÍTULO primeiro (mais específico), depois TÍTULO
+    // Importante: "Subtítulo" contém "titulo", então verificar subtítulo ANTES!
     const isSubtitulo = tipo.includes('subtítulo') || tipo.includes('subtitulo');
+    const isTitulo = !isSubtitulo && (tipo.includes('título') || tipo.includes('titulo'));
 
     // 🔍 DEBUG: Log para entender estrutura
     React.useEffect(() => {
