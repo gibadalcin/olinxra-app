@@ -390,7 +390,9 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
                             setImageAspectRatio(w / h);
                         }
                     }}
-                />                {/* Botão "Ver em AR" - só aparece se tiver GLB */}
+                />
+
+                {/* Botão "Ver em AR" - só aparece se tiver GLB */}
                 {glbUrl && (
                     <TouchableOpacity
                         style={styles.headerARButton}
