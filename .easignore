@@ -1,7 +1,27 @@
-# EAS Build ignore file
-# Este arquivo força o EAS a usar git para coletar arquivos
-# ao invés de criar um tarball manualmente, o que resolve
-# problemas com caracteres especiais em nomes de pastas (como parênteses)
+# Dependências
+node_modules/
 
-# Garantir que dist/ NÃO seja ignorado
+# Ambiente
+.env
+*.env
+
+# Build e cache
 dist/
+temp/
+*.bak
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Exceções para VSCode
+!.vscode/extensions.json
+
+# Expo
+.expo/
