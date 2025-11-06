@@ -422,19 +422,32 @@ function TextBlock({ bloco }: { bloco: any }) {
     const isTitulo = tipo.includes('título') || tipo.includes('titulo');
     const isSubtitulo = tipo.includes('subtítulo') || tipo.includes('subtitulo');
 
+    // 🔍 DEBUG: Log para entender estrutura
+    React.useEffect(() => {
+        if (isSubtitulo || isTitulo) {
+            console.log('[TextBlock] 🔍 Bloco:', {
+                tipo,
+                isTitulo,
+                isSubtitulo,
+                titulo: titulo ? 'TEM' : 'NULL',
+                conteudo: conteudo ? conteudo.substring(0, 30) + '...' : 'NULL'
+            });
+        }
+    }, [tipo, isTitulo, isSubtitulo, titulo, conteudo]);
+
     return (
         <View style={styles.textBlock}>
-            {/* TÍTULO PRINCIPAL - Maior destaque visual */}
-            {isTitulo && conteudo && (
+            {/* TÍTULO PRINCIPAL - Renderiza APENAS conteudo */}
+            {isTitulo && (
                 <Text style={styles.mainTitle}>{conteudo}</Text>
             )}
 
-            {/* SUBTÍTULO - Destaque médio (SEM duplicar no fallback) */}
-            {isSubtitulo && conteudo && (
+            {/* SUBTÍTULO - Renderiza APENAS conteudo (NUNCA titulo) */}
+            {isSubtitulo && (
                 <Text style={styles.subtitle}>{conteudo}</Text>
             )}
 
-            {/* TEXTO NORMAL - Pode ter título interno opcional (SOMENTE se não for título nem subtítulo) */}
+            {/* TEXTO NORMAL - Renderiza titulo (opcional) + conteudo */}
             {!isTitulo && !isSubtitulo && (
                 <>
                     {titulo && <Text style={styles.textTitle}>{titulo}</Text>}
