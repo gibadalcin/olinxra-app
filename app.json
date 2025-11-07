@@ -41,6 +41,12 @@
         "projectId": "0105cf14-9575-4bdf-85df-c494395ed03c"
       }
     },
+    "icon": "./assets/images/mini-app.png",
+    "splash": {
+      "image": "./assets/images/logo-splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "runtimeVersion": {
       "policy": "appVersion"
     },

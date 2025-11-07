@@ -17,10 +17,19 @@ export default function Splash() {
     const logo = require("@/assets/images/logo-splash.png");
 
     useEffect(() => {
-        const interval = setInterval(() => {
+        // 1. Variável de controle (deve ser 'let' e inicializada)
+        let animationFrameId: number | undefined;
+
+        // 2. Definindo o ciclo de atualização de progresso
+        const updateProgress = () => {
+            // Usamos setProgress com a função de callback para garantir que usamos o valor 'prev'
             setProgress((prev) => {
                 if (prev >= 100) {
-                    clearInterval(interval);
+                    // Se atingir 100%, paramos o loop e iniciamos o fade
+                    if (animationFrameId) {
+                        cancelAnimationFrame(animationFrameId);
+                    }
+
                     Animated.timing(fadeAnim, {
                         toValue: 0,
                         duration: 600,
@@ -30,11 +39,30 @@ export default function Splash() {
                     });
                     return 100;
                 }
-                return prev + 2;
+
+                // Calculamos o próximo progresso
+                const nextProgress = prev + .5;
+
+                // Agendamos o próximo frame ANTES de retornar o novo estado,
+                // garantindo que o loop continue.
+                animationFrameId = requestAnimationFrame(updateProgress);
+
+                return nextProgress;
             });
-        }, 30);
-        return () => clearInterval(interval);
-    }, [fadeAnim, router]);
+        };
+
+        // 3. Chamada inicial para começar o loop
+        animationFrameId = requestAnimationFrame(updateProgress);
+
+        // 4. Função de limpeza (cleanup) do useEffect
+        return () => {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+        };
+
+        // Adicione 'fadeAnim' às dependências se for uma ref/valor externo ao componente
+    }, [router, fadeAnim]);
 
     return (
         <>
