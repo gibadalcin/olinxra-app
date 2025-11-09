@@ -17,6 +17,7 @@ import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useARPayload } from '@/context/ARPayloadContext';
+import { dbg } from '../src/utils/debugLog';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TAB_BAR_HEIGHT = 0; // manter em sincronia com CustomTabBar.tsx
@@ -53,11 +54,11 @@ export function ContentBlocks({ blocos }: ContentBlocksProps) {
 
     // 🔍 DEBUG: Verificar se há blocos duplicados
     React.useEffect(() => {
-        console.log('[ContentBlocks] 📊 Total de blocos recebidos:', blocos.length);
-        console.log('[ContentBlocks] 📝 Total de textBlocks:', textBlocks.length);
+        dbg('[ContentBlocks] 📊 Total de blocos recebidos:', blocos.length);
+        dbg('[ContentBlocks] 📝 Total de textBlocks:', textBlocks.length);
 
         textBlocks.forEach((b, idx) => {
-            console.log(`[ContentBlocks] 📄 textBlock[${idx}]:`, {
+            dbg(`[ContentBlocks] 📄 textBlock[${idx}]:`, {
                 tipo: b?.tipo,
                 titulo: b?.titulo ? b.titulo.substring(0, 20) + '...' : 'NULL',
                 conteudo: b?.conteudo ? b.conteudo.substring(0, 30) + '...' : 'NULL'
@@ -110,7 +111,7 @@ export function ContentBlocks({ blocos }: ContentBlocksProps) {
 
             // Image.prefetch para cache nativo (rápido, não bloqueia)
             if (urls.length > 0 && Image?.prefetch) {
-                console.log('[ContentBlocks] 🔁 Image.prefetch para', urls.length, 'URLs');
+                dbg('[ContentBlocks] 🔁 Image.prefetch para', urls.length, 'URLs');
                 urls.forEach((u) => {
                     Image.prefetch(u).catch(() => { }); // swallow errors
                 });
@@ -169,7 +170,7 @@ function BlockRenderer({ bloco, index }: { bloco: any; index: number }) {
 
     // 🔍 DEBUG: Log de cada renderização
     React.useEffect(() => {
-        console.log(`[BlockRenderer ${index}] 🎬 Renderizando:`, {
+        dbg(`[BlockRenderer ${index}] 🎬 Renderizando:`, {
             tipo: bloco?.tipo,
             isTitulo: tipo.includes('título') || tipo.includes('titulo'),
             isSubtitulo: tipo.includes('subtítulo') || tipo.includes('subtitulo'),
@@ -215,11 +216,13 @@ function BlockRenderer({ bloco, index }: { bloco: any; index: number }) {
 // ========== COMPONENTES DE BLOCOS ==========
 
 function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco: any; localHeaderUri?: string | null }) {
-    const imageUrl = bloco?.signed_url || bloco?.url || bloco?.previewDataUrl;
+    // Priorizar preview lightweight quando disponível (preview_signed_url compatível com backend)
+    const imageUrl = bloco?.preview_signed_url || bloco?.previewSignedUrl || bloco?.signed_url || bloco?.signedUrl || bloco?.url || bloco?.previewDataUrl;
     const titulo = bloco?.titulo || bloco?.label;
     const glbUrl = bloco?.glb_signed_url || bloco?.glb_url;
     const [imageAspectRatio, setImageAspectRatio] = React.useState<number>(16 / 9);
     const [localUri, setLocalUri] = React.useState<string | null>(null);
+    const [imageLoaded, setImageLoaded] = React.useState<boolean>(false);
 
     // Preferir mapa de URIs locais provido pelo contexto. Isso garante que
     // o Header passe a usar o arquivo local assim que o contexto o baixar,
@@ -235,11 +238,14 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
 
     // DEBUG: checar e logar fontes e estado local
     React.useEffect(() => {
-        console.log('[HeaderBlock] 🔍 filename:', filename);
-        console.log('[HeaderBlock] 🔍 ctxLocal present?', !!ctxLocal, ctxLocal);
-        console.log('[HeaderBlock] 🔍 externalLocalHeaderUri present?', !!externalLocalHeaderUri, externalLocalHeaderUri);
-        console.log('[HeaderBlock] 🔍 previewDataUrl present?', !!bloco?.previewDataUrl);
-        console.log('[HeaderBlock] 🔍 imageUrl (remote) present?', !!imageUrl && typeof imageUrl === 'string' && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')));
+        dbg('[HeaderBlock] 🔍 filename:', filename);
+        dbg('[HeaderBlock] 🔍 ctxLocal present?', !!ctxLocal, ctxLocal);
+        dbg('[HeaderBlock] 🔍 externalLocalHeaderUri present?', !!externalLocalHeaderUri, externalLocalHeaderUri);
+        dbg('[HeaderBlock] 🔍 previewDataUrl present?', !!bloco?.previewDataUrl);
+        dbg('[HeaderBlock] 🔍 imageUrl (remote) present?', !!imageUrl && typeof imageUrl === 'string' && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')));
+        // Logar explicitamente preview vs signed para diagnóstico de falhas
+        dbg('[HeaderBlock] 🔍 bloco.preview_signed_url:', bloco?.preview_signed_url || bloco?.previewSignedUrl);
+        dbg('[HeaderBlock] 🔍 bloco.signed_url:', bloco?.signed_url || bloco?.signedUrl);
     }, [filename, ctxLocal, externalLocalHeaderUri, bloco?.previewDataUrl, imageUrl]);
 
     // payload não é utilizado aqui; removido para evitar erro de variável não utilizada
@@ -296,7 +302,7 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
             if (!mounted) return;
             const candidate = headerLocalMap?.[filename];
             if (candidate) {
-                console.log('[HeaderBlock] � Cache local disponível, fazendo upgrade:', filename);
+                dbg('[HeaderBlock] � Cache local disponível, fazendo upgrade:', filename);
                 setFoundAt(Date.now());
                 setDisplayUri(candidate);
                 clearInterval(checkInterval);
@@ -343,7 +349,7 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
                     : await (FileSystem as any).getInfoAsync(dest);
 
                 if (info && info.exists) {
-                    console.log('[HeaderBlock] ✅ Cache já existe:', info.uri);
+                    dbg('[HeaderBlock] ✅ Cache já existe:', info.uri);
                     setLocalUri(info.uri);
                 }
             } catch (e) {
@@ -354,8 +360,8 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
 
     // Log do src efetivo para debugging rápido
     React.useEffect(() => {
-        console.log('[HeaderBlock] ℹ️ displayUri atual:', displayUri);
-        console.log('[HeaderBlock] ℹ️ Tipo de fonte:',
+        dbg('[HeaderBlock] ℹ️ displayUri atual:', displayUri);
+        dbg('[HeaderBlock] ℹ️ Tipo de fonte:',
             displayUri?.startsWith('file://') ? 'CACHE LOCAL (melhor)' :
                 displayUri?.startsWith('data:') ? 'PREVIEW BASE64 (rápido)' :
                     displayUri?.startsWith('http') ? 'URL REMOTA (lento)' :
@@ -373,11 +379,11 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
 
         const modelToOpen = glbUrl || brandModel;
         if (modelToOpen) {
-            console.log('[HeaderBlock] 🎯 Abrindo AR nativo com GLB:', modelToOpen);
+            dbg('[HeaderBlock] 🎯 Abrindo AR nativo com GLB:', modelToOpen);
             try {
                 const sceneViewerUrl = `https://arvr.google.com/scene-viewer/1.2?file=${encodeURIComponent(modelToOpen)}&mode=ar_preferred`;
                 await Linking.openURL(sceneViewerUrl);
-                console.log('[HeaderBlock] ✅ Scene Viewer aberto com sucesso!');
+                dbg('[HeaderBlock] ✅ Scene Viewer aberto com sucesso!');
             } catch (error) {
                 console.error('[HeaderBlock] ❌ Erro ao abrir Scene Viewer:', error);
             }
@@ -385,12 +391,12 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
         }
 
         if (brandUrl) {
-            console.log('[HeaderBlock] ℹ️ Sem GLB — abrindo URL da marca como fallback:', brandUrl);
+            dbg('[HeaderBlock] ℹ️ Sem GLB — abrindo URL da marca como fallback:', brandUrl);
             try { await Linking.openURL(brandUrl); } catch (e) { console.error('[HeaderBlock] ❌ Erro abrindo brand URL:', e); }
             return;
         }
 
-        console.log('[HeaderBlock] ❌ Nenhum GLB ou modelo disponível para este header');
+        dbg('[HeaderBlock] ❌ Nenhum GLB ou modelo disponível para este header');
         Alert.alert('AR não disponível', 'Não há modelo 3D disponível para este item.');
     };
 
@@ -413,18 +419,31 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
                     transition={0}
                     // ✅ Cache agressivo
                     cachePolicy="memory-disk"
+                    onError={(err) => {
+                        console.warn('[HeaderBlock] ❌ Image onError:', filename, err);
+                        // se está tentando carregar o preview e falha, tentar fallback para signed_url
+                        const previewUrl = bloco?.preview_signed_url || bloco?.previewSignedUrl;
+                        const signedUrl = bloco?.signed_url || bloco?.signedUrl || bloco?.url;
+                        if (displayUri && previewUrl && displayUri === previewUrl && signedUrl) {
+                            dbg('[HeaderBlock] ℹ️ Fallback: preview falhou, tentando signed_url para', filename);
+                            setDisplayUri(signedUrl);
+                        }
+                    }}
+                    onLoadEnd={() => {
+                        dbg('[HeaderBlock] 🖼️ Image onLoadEnd:', filename, 'displayUri=', displayUri?.substring(0, 120));
+                    }}
                     onLoad={(event) => {
                         const loadAt = Date.now();
                         const latency = loadAt - mountedAt;
-                        console.log('[HeaderBlock] 🖼️ Image onLoad:', filename);
-                        console.log('[HeaderBlock] ⏱️ Latência total:', latency, 'ms');
-                        console.log('[HeaderBlock] 📊 Fonte:',
+                        dbg('[HeaderBlock] 🖼️ Image onLoad:', filename);
+                        dbg('[HeaderBlock] ⏱️ Latência total:', latency, 'ms');
+                        dbg('[HeaderBlock] 📊 Fonte:',
                             displayUri?.startsWith('file://') ? 'CACHE' :
                                 displayUri?.startsWith('data:') ? 'PREVIEW' : 'REMOTA'
                         );
 
                         if (foundAt) {
-                            console.log('[HeaderBlock] ⏱️ Tempo cache->render:', loadAt - foundAt, 'ms');
+                            dbg('[HeaderBlock] ⏱️ Tempo cache->render:', loadAt - foundAt, 'ms');
                         }
 
                         // Calcula aspect ratio da imagem real
@@ -433,11 +452,12 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
                         if (w && h) {
                             setImageAspectRatio(w / h);
                         }
+                        setImageLoaded(true);
                     }}
                 />
 
                 {/* Botão "Ver em AR" - só aparece se tiver GLB */}
-                {glbUrl && (
+                {glbUrl && imageLoaded && (
                     <TouchableOpacity
                         style={styles.headerARButton}
                         onPress={handleARPress}
@@ -470,7 +490,7 @@ function TextBlock({ bloco }: { bloco: any }) {
     // 🔍 DEBUG: Log para entender estrutura
     React.useEffect(() => {
         if (isSubtitulo || isTitulo) {
-            console.log('[TextBlock] 🔍 Bloco:', {
+            dbg('[TextBlock] 🔍 Bloco:', {
                 tipo,
                 isTitulo,
                 isSubtitulo,
@@ -505,14 +525,20 @@ function TextBlock({ bloco }: { bloco: any }) {
 
 // ========== COMPONENTE AUXILIAR: CAROUSEL CARD ==========
 function CarouselCard({ item, index }: { item: any; index: number }) {
-    const imageUrl = item?.signed_url || item?.url || item?.previewDataUrl;
+    // Priorizar preview_signed_url para cards também
+    const imageUrl = item?.preview_signed_url || item?.previewSignedUrl || item?.signed_url || item?.signedUrl || item?.url || item?.previewDataUrl;
     const action = item?.action;
     const glbUrl = item?.glb_signed_url || item?.glb_url;
     const { headerLocalMap, payload } = useARPayload();
+    const [cardImageLoaded, setCardImageLoaded] = React.useState<boolean>(false);
+    // src atual do card (pode trocar de preview_signed_url -> signed_url em fallback)
+    const filenameForCard = item?.filename || item?.nome || String((imageUrl || '').split('/').pop());
+    const initialCardSrc = headerLocalMap?.[filenameForCard] || item?.previewDataUrl || imageUrl;
+    const [cardSrc, setCardSrc] = React.useState<string>(initialCardSrc);
 
     // 🔍 DEBUG: Verificar estrutura do item
     React.useEffect(() => {
-        console.log(`[CarouselCard ${index}] 🔍 Item:`, {
+        dbg(`[CarouselCard ${index}] 🔍 Item:`, {
             imageUrl: imageUrl ? 'EXISTE' : 'NULL',
             action: action?.href || 'SEM ACTION',
             glbUrl: glbUrl || 'SEM GLB',
@@ -525,13 +551,13 @@ function CarouselCard({ item, index }: { item: any; index: number }) {
     }
 
     const handleImagePress = () => {
-        console.log('[CarouselCard] 📌 Imagem clicada!');
-        console.log('[CarouselCard] 🔍 action completo:', action);
+        dbg('[CarouselCard] 📌 Imagem clicada!');
+        dbg('[CarouselCard] 🔍 action completo:', action);
 
         // action pode ser string direta ou objeto com href
         const href = typeof action === 'string' ? action : action?.href;
 
-        console.log('[CarouselCard] 🔗 href extraído:', href);
+        dbg('[CarouselCard] 🔗 href extraído:', href);
 
         // Verificar se tem href válido
         if (
@@ -545,12 +571,12 @@ function CarouselCard({ item, index }: { item: any; index: number }) {
                 href.startsWith('tel:') ||
                 href.startsWith('mailto:'))
         ) {
-            console.log('[CarouselCard] ✅ Abrindo link:', href);
+            dbg('[CarouselCard] ✅ Abrindo link:', href);
             Linking.openURL(href).catch((err) => {
                 console.error('[CarouselCard] ❌ Erro ao abrir link:', err);
             });
         } else {
-            console.log('[CarouselCard] ⚠️ Sem link válido para abrir, href:', href);
+            dbg('[CarouselCard] ⚠️ Sem link válido para abrir, href:', href);
         }
     };
 
@@ -563,11 +589,11 @@ function CarouselCard({ item, index }: { item: any; index: number }) {
 
         const modelToOpen = glbUrl || brandModel;
         if (modelToOpen) {
-            console.log('[CarouselCard] 🎯 Abrindo AR nativo com GLB:', modelToOpen);
+            dbg('[CarouselCard] 🎯 Abrindo AR nativo com GLB:', modelToOpen);
             try {
                 const sceneViewerUrl = `https://arvr.google.com/scene-viewer/1.2?file=${encodeURIComponent(modelToOpen)}&mode=ar_preferred`;
                 await Linking.openURL(sceneViewerUrl);
-                console.log('[CarouselCard] ✅ Scene Viewer aberto com sucesso!');
+                dbg('[CarouselCard] ✅ Scene Viewer aberto com sucesso!');
             } catch (error) {
                 console.error('[CarouselCard] ❌ Erro ao abrir Scene Viewer:', error);
             }
@@ -575,12 +601,12 @@ function CarouselCard({ item, index }: { item: any; index: number }) {
         }
 
         if (brandUrl) {
-            console.log('[CarouselCard] ℹ️ Sem GLB — abrindo URL da marca como fallback:', brandUrl);
+            dbg('[CarouselCard] ℹ️ Sem GLB — abrindo URL da marca como fallback:', brandUrl);
             try { await Linking.openURL(brandUrl); } catch (e) { console.error('[CarouselCard] ❌ Erro abrindo brand URL:', e); }
             return;
         }
 
-        console.log('[CarouselCard] ❌ Nenhum GLB ou modelo disponível para este item');
+        dbg('[CarouselCard] ❌ Nenhum GLB ou modelo disponível para este item');
         Alert.alert('AR não disponível', 'Não há modelo 3D disponível para este item.');
     };
 
@@ -598,18 +624,33 @@ function CarouselCard({ item, index }: { item: any; index: number }) {
                     const isRemoteImg = typeof src === 'string' && (src.startsWith('http://') || src.startsWith('https://'));
                     return (
                         <Image
-                            source={{ uri: src }}
+                            source={{ uri: cardSrc }}
                             style={styles.carouselImage}
                             contentFit="cover"
                             placeholder={item?.previewDataUrl || require('../assets/images/adaptive-icon.png')}
                             transition={isRemoteImg ? 200 : 0}
+                            onLoad={() => {
+                                setCardImageLoaded(true);
+                            }}
+                            onError={(err) => {
+                                console.warn('[CarouselCard] ❌ Image onError:', item?.filename || item?.nome, err);
+                                // se estava tentando carregar preview_signed_url, tentar fallback para signed_url
+                                const previewUrl = item?.preview_signed_url || item?.previewSignedUrl;
+                                const signedUrl = item?.signed_url || item?.signedUrl || item?.url;
+                                if (cardSrc && previewUrl && cardSrc === previewUrl && signedUrl) {
+                                    dbg('[CarouselCard] ℹ️ Fallback: preview falhou, tentando signed_url para', filenameForCard);
+                                    setCardSrc(signedUrl);
+                                    return;
+                                }
+                                setCardImageLoaded(false);
+                            }}
                         />
                     );
                 })()}
             </TouchableOpacity>
 
             {/* Botão "Ver em AR" - só aparece se tiver GLB */}
-            {glbUrl && (
+            {glbUrl && cardImageLoaded && (
                 <TouchableOpacity
                     style={styles.carouselARButton}
                     onPress={handleARPress}
@@ -727,12 +768,12 @@ function ButtonBlock({ bloco }: { bloco: any }) {
 
     // 🔍 DEBUG: Verificar estrutura do bloco
     React.useEffect(() => {
-        console.log('[ButtonBlock] 🔍 Bloco completo:', JSON.stringify(bloco, null, 2));
-        console.log('[ButtonBlock] 📋 action:', action);
-        console.log('[ButtonBlock] 🔗 action?.href:', action?.href);
-        console.log('[ButtonBlock] 🔗 bloco?.href:', bloco?.href);
-        console.log('[ButtonBlock] 🔗 bloco?.url:', bloco?.url);
-        console.log('[ButtonBlock] 🔗 bloco?.link:', bloco?.link);
+        dbg('[ButtonBlock] 🔍 Bloco completo:', JSON.stringify(bloco, null, 2));
+        dbg('[ButtonBlock] 📋 action:', action);
+        dbg('[ButtonBlock] 🔗 action?.href:', action?.href);
+        dbg('[ButtonBlock] 🔗 bloco?.href:', bloco?.href);
+        dbg('[ButtonBlock] 🔗 bloco?.url:', bloco?.url);
+        dbg('[ButtonBlock] 🔗 bloco?.link:', bloco?.link);
     }, [bloco, action]);
 
     // ✅ Suporta cor hexadecimal diretamente ou nomes de cores
@@ -833,7 +874,7 @@ function ButtonBlock({ bloco }: { bloco: any }) {
     const queuedPressRef = React.useRef<boolean>(false);
 
     const performButtonAction = React.useCallback(() => {
-        console.log('[ButtonBlock] ▶ Executando ação do botão (performButtonAction)');
+        dbg('[ButtonBlock] ▶ Executando ação do botão (performButtonAction)');
         const url = action?.href;
         if (url && typeof Linking !== 'undefined') {
             Linking.openURL(url).catch((err) => {
@@ -850,14 +891,14 @@ function ButtonBlock({ bloco }: { bloco: any }) {
             tension: 50,
             friction: 8,
         }).start(() => {
-            console.log('[ButtonBlock] ✅ Animação concluída, isOpen:', isOpen);
+            dbg('[ButtonBlock] ✅ Animação concluída, isOpen:', isOpen);
             setIsAnimating(false);
 
             // Se houve um toggle enfileirado durante a animação, processa primeiro
             if (queuedToggleRef.current !== null) {
                 const desired = queuedToggleRef.current;
                 queuedToggleRef.current = null;
-                console.log('[ButtonBlock] ▶ Processando toggle enfileirado ->', desired);
+                dbg('[ButtonBlock] ▶ Processando toggle enfileirado ->', desired);
                 // Executa o toggle agora (isso disparará nova animação)
                 setIsOpen(desired);
                 return; // aguarda próxima animação para possíveis queuedPress
@@ -866,7 +907,7 @@ function ButtonBlock({ bloco }: { bloco: any }) {
             // Se houve um clique no botão enfileirado, executa a ação
             if (queuedPressRef.current) {
                 queuedPressRef.current = false;
-                console.log('[ButtonBlock] ▶ Processando clique enfileirado');
+                dbg('[ButtonBlock] ▶ Processando clique enfileirado');
                 performButtonAction();
             }
         });
@@ -880,12 +921,12 @@ function ButtonBlock({ bloco }: { bloco: any }) {
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 onPress={() => {
                     if (isAnimating) {
-                        console.log('[ButtonBlock] ⏳ Aba clicada DURANTE animação — enfileirando toggle');
+                        dbg('[ButtonBlock] ⏳ Aba clicada DURANTE animação — enfileirando toggle');
                         // Enfileira o estado desejado para ser processado ao final da animação
                         queuedToggleRef.current = !isOpen;
                         return;
                     }
-                    console.log('[ButtonBlock] 📌 Aba clicada, isOpen atual (toggle):', isOpen);
+                    dbg('[ButtonBlock] 📌 Aba clicada, isOpen atual (toggle):', isOpen);
                     setIsOpen((prev) => !prev);
                 }}
                 activeOpacity={0.8}
@@ -917,17 +958,17 @@ function ButtonBlock({ bloco }: { bloco: any }) {
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                     onPressIn={() => {
                         if (isAnimating) {
-                            console.log('[ButtonBlock] ⏳ onPressIn durante animação — executando ação imediatamente');
+                            dbg('[ButtonBlock] ⏳ onPressIn durante animação — executando ação imediatamente');
                             performButtonAction();
                         }
                     }}
                     onPress={() => {
                         // onPress roda após onPressIn; a ação já pode ter sido disparada aí.
                         if (isAnimating) {
-                            console.log('[ButtonBlock] ⏳ onPress detectado durante animação - ação possivelmente já executada');
+                            dbg('[ButtonBlock] ⏳ onPress detectado durante animação - ação possivelmente já executada');
                             return;
                         }
-                        console.log('[ButtonBlock] 🖱️ Botão PRESSIONADO!');
+                        dbg('[ButtonBlock] 🖱️ Botão PRESSIONADO!');
                         performButtonAction();
                     }}
                 >
