@@ -45,7 +45,7 @@ export function ARPayloadProvider({ children }: { children: ReactNode }) {
     const [shouldAutoLaunch, setShouldAutoLaunchState] = useState<boolean>(false); // ✅ Estado de auto-launch
 
     const setPayload = useCallback((newPayload: any | null) => {
-        console.log('[ARPayloadContext] 📦 setPayload chamado:', newPayload ? 'presente' : 'null');
+        console.log('[ARPayloadContext] 📦 setPayload chamado:', newPayload ? 'presente' : 'null', new Date().toISOString());
 
         if (newPayload) {
             // ✅ CORREÇÃO: Gera chave única usando HASH completo do previewImage
@@ -213,6 +213,7 @@ export function ARPayloadProvider({ children }: { children: ReactNode }) {
                             console.warn('[ARPayloadContext] falha no download antecipado da imagem', entry.filename, (e as any)?.message || e);
                         }
                     }
+                    console.log('[ARPayloadContext] 🔁 download antecipado loop finalizado em', new Date().toISOString());
                 } catch (e) {
                     // swallow
                 }
@@ -312,6 +313,7 @@ export function ARPayloadProvider({ children }: { children: ReactNode }) {
                         console.warn('[ARPayloadContext] prefetchImagesForPayload falha no download:', entry.filename, (e as any)?.message || e);
                     }
                 }
+                console.log('[ARPayloadContext] 🔁 prefetchImagesForPayload loop finalizado em', new Date().toISOString());
             } catch (e) {
                 // swallow
             }
@@ -321,6 +323,8 @@ export function ARPayloadProvider({ children }: { children: ReactNode }) {
     // pré-carrega o header e aguarda um filename específico aparecer em headerLocalMap (útil para navegação síncrona)
     const prefetchHeaderAndWait = useCallback(async (newPayload: any | null, filename: string | null, timeoutMs = 1200): Promise<boolean> => {
         if (!newPayload || !filename) return false;
+        const tStart = Date.now();
+        console.log('[ARPayloadContext] 🔔 prefetchHeaderAndWait START:', filename, new Date(tStart).toISOString(), `timeoutMs=${timeoutMs}`);
         try {
             // inicia o prefetch normalmente (dispara downloads em background)
             try { prefetchImagesForPayload && prefetchImagesForPayload(newPayload); } catch (e) { /* swallow */ }
@@ -328,14 +332,20 @@ export function ARPayloadProvider({ children }: { children: ReactNode }) {
             const start = Date.now();
             while (Date.now() - start < timeoutMs) {
                 if (headerLocalMap && filename && headerLocalMap[filename]) {
+                    const tOk = Date.now();
+                    console.log('[ARPayloadContext] 🔔 prefetchHeaderAndWait SUCCESS:', filename, new Date(tOk).toISOString(), 'elapsed_ms=', tOk - tStart);
                     return true;
                 }
                 // sleep 80ms
                 // eslint-disable-next-line no-await-in-loop
                 await new Promise((r) => setTimeout(r, 80));
             }
+            const tTimeout = Date.now();
+            console.log('[ARPayloadContext] 🔔 prefetchHeaderAndWait TIMEOUT:', filename, new Date(tTimeout).toISOString(), 'elapsed_ms=', tTimeout - tStart);
             return false;
         } catch (e) {
+            const tErr = Date.now();
+            console.log('[ARPayloadContext] 🔔 prefetchHeaderAndWait ERROR:', filename, new Date(tErr).toISOString(), 'error=', (e as any)?.message || e);
             return false;
         }
     }, [headerLocalMap, prefetchImagesForPayload]);

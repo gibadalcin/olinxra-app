@@ -171,8 +171,10 @@ export function useARContent() {
       // 🚀 1) TRY SMART CONTENT FIRST (PARALELO - SUPER RÁPIDO!)
       updateStage('Buscando conteúdo...');
       const smartStart = performance.now();
+      console.log('[useARContent] 🔔 smartContent REQUEST START:', new Date().toISOString());
       const smartResult = await fetchSmartContent(nome_marca, lat, lon);
-      console.log(`[useARContent] ⚡ Smart content: ${((performance.now() - smartStart) / 1000).toFixed(2)}s`);
+      const smartEnd = performance.now();
+      console.log('[useARContent] 🔔 smartContent REQUEST END:', new Date().toISOString(), `duration_s=${((smartEnd - smartStart) / 1000).toFixed(2)}`);
 
       if (smartResult && smartResult.conteudo) {
         // iniciar prefetch de imagens o quanto antes (não bloqueante)
@@ -188,8 +190,10 @@ export function useARContent() {
       // 2) FALLBACK: Try consulta helper (caso smart-content falhe)
       updateStage('Buscando conteúdo próximo...');
       const consultaStart = performance.now();
+      console.log('[useARContent] 🔔 consultaHelper REQUEST START:', new Date().toISOString());
       const consulta = await fetchConsultaHelper(nome_marca, lat, lon, options.initialRadius);
-      console.log(`[useARContent] ⏱️ Consulta helper: ${((performance.now() - consultaStart) / 1000).toFixed(2)}s`);
+      const consultaEnd = performance.now();
+      console.log('[useARContent] 🔔 consultaHelper REQUEST END:', new Date().toISOString(), `duration_s=${((consultaEnd - consultaStart) / 1000).toFixed(2)}`);
 
       if (consulta && consulta.conteudo) {
         try { prefetchImagesForPayload && prefetchImagesForPayload(consulta); } catch (e) { }
@@ -205,8 +209,10 @@ export function useARContent() {
       for (let r of radii) {
         updateStage(`Expandindo busca (raio ${r}m)...`);
         const radiusStart = performance.now();
+        console.log('[useARContent] 🔔 fetchByRadius REQUEST START:', new Date().toISOString(), `radius=${r}`);
         const resp = await fetchByRadius(nome_marca, lat, lon, r);
-        console.log(`[useARContent] ⏱️ Radius ${r}m: ${((performance.now() - radiusStart) / 1000).toFixed(2)}s`);
+        const radiusEnd = performance.now();
+        console.log('[useARContent] 🔔 fetchByRadius REQUEST END:', new Date().toISOString(), `radius=${r}`, `duration_s=${((radiusEnd - radiusStart) / 1000).toFixed(2)}`);
 
         if (resp && resp.conteudo) {
           try { prefetchImagesForPayload && prefetchImagesForPayload(resp); } catch (e) { }
@@ -222,9 +228,11 @@ export function useARContent() {
       // 4) FALLBACK: try region-level fallbacks using reverse geocode from device
       updateStage('Buscando por região...');
       const geocodeStart = performance.now();
+      console.log('[useARContent] 🔔 reverse-geocode REQUEST START:', new Date().toISOString());
       try {
         const rev = await fetch(`${API_CONFIG.BASE_URL}/api/reverse-geocode?lat=${lat}&lon=${lon}`);
-        console.log(`[useARContent] ⏱️ Reverse geocode: ${((performance.now() - geocodeStart) / 1000).toFixed(2)}s`);
+        const geocodeEnd = performance.now();
+        console.log('[useARContent] 🔔 reverse-geocode REQUEST END:', new Date().toISOString(), `duration_s=${((geocodeEnd - geocodeStart) / 1000).toFixed(2)}`);
 
         if (rev.ok) {
           const addr = await rev.json();

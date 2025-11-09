@@ -249,9 +249,29 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
     // 1. Cache local (file://) - melhor performance
     // 2. Preview base64 (data:) - carregamento instantâneo
     // 3. URL remota (https://) - fallback final
+    // Helper: valida se previewDataUrl é um data URI base64 utilizável
+    const isValidBase64 = (url: string | null | undefined) => {
+        if (!url || typeof url !== 'string') return false;
+        if (!url.startsWith('data:image')) return false;
+        // base64 válido tem vírgula separando header e payload
+        return url.includes(',') && url.indexOf(',') < 150;
+    };
 
-    // Estado inicial: mostrar preview ou URL remota IMEDIATAMENTE (sem esperar cache)
-    const initialSrc = bloco?.previewDataUrl || imageUrl;
+    // Se o próprio bloco não tiver previewDataUrl, tentar aproveitar preview de items (carousel)
+    let previewCandidate: string | null = null;
+    if (isValidBase64(bloco?.previewDataUrl)) {
+        previewCandidate = bloco.previewDataUrl;
+    } else if (Array.isArray(bloco?.items)) {
+        for (const it of bloco.items) {
+            if (isValidBase64(it?.previewDataUrl)) {
+                previewCandidate = it.previewDataUrl;
+                break;
+            }
+        }
+    }
+
+    // Estado inicial: mostrar preview (base64) se válido, caso contrário usar URL remota
+    const initialSrc = previewCandidate || bloco?.previewDataUrl || imageUrl;
     const [displayUri, setDisplayUri] = React.useState<string>(
         ctxLocal || localUri || initialSrc || ''
     );
@@ -387,7 +407,7 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
                     style={[styles.headerImage, { aspectRatio: imageAspectRatio }]}
                     contentFit="contain"
                     // ✅ Placeholder inteligente: preview base64 se disponível
-                    placeholder={bloco?.previewDataUrl || require('../assets/images/adaptive-icon.png')}
+                    placeholder={previewCandidate || bloco?.previewDataUrl || require('../assets/images/adaptive-icon.png')}
                     placeholderContentFit="cover"
                     // ✅ Sem transição (renderização imediata)
                     transition={0}

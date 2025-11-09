@@ -43,14 +43,16 @@ export function ImageDecisionModal({
     const { setPayload: setARPayload, headerLocalMap, prefetchImagesForPayload } = useARPayload(); // ✅ Hook do Context
 
     const handleCompare = React.useCallback(async () => {
-        console.log('[ImageDecisionModal] 🎬 Iniciando reconhecimento de logo...');
+        const t0 = Date.now();
+        console.log('[ImageDecisionModal] 🎬 Iniciando reconhecimento de logo... t0=', new Date(t0).toISOString());
         setLoading(true);
         setLoadingMessage('Reconhecendo logo...');
         let shouldCancel = true;
         try {
             console.log('[ImageDecisionModal] 📸 URI da imagem:', imageUri?.substring(0, 100) + '...');
             const result = await compareLogo(imageUri);
-            console.log('[ImageDecisionModal] 📊 Resultado do compareLogo:', result?.status);
+            const tRecognized = Date.now();
+            console.log('[ImageDecisionModal] 📊 Resultado do compareLogo:', result?.status, 't_recognized=', new Date(tRecognized).toISOString(), 'elapsed_ms=', tRecognized - t0);
 
             if ((result.status === 'cached' || result.status === 'recognized') && 'data' in result && result.data && typeof result.data.name === 'string') {
                 console.log('[ImageDecisionModal] ✅ Logo reconhecida:', result.data.name);
@@ -71,11 +73,15 @@ export function ImageDecisionModal({
                         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
                         const lat = loc.coords.latitude;
                         const lon = loc.coords.longitude;
-                        console.log('[ImageDecisionModal] 📍 Localização obtida:', { lat, lon });
+                        const tLocation = Date.now();
+                        console.log('[ImageDecisionModal] 📍 Localização obtida:', { lat, lon }, 't_location=', new Date(tLocation).toISOString(), 'elapsed_ms=', tLocation - tRecognized);
 
                         console.log('[ImageDecisionModal] 🔍 Buscando conteúdo para marca:', result.data.name);
+                        const tFetchStart = Date.now();
+                        console.log('[ImageDecisionModal] 🔔 fetchContentForRecognition START t_fetch_start=', new Date(tFetchStart).toISOString());
                         const resp = await fetchContentForRecognition(result.data.name, lat, lon);
-                        console.log('[ImageDecisionModal] 📦 Resposta fetchContent:', resp ? 'dados recebidos' : 'null');
+                        const tFetchEnd = Date.now();
+                        console.log('[ImageDecisionModal] 📦 Resposta fetchContent:', resp ? 'dados recebidos' : 'null', 't_fetch_end=', new Date(tFetchEnd).toISOString(), 'elapsed_ms=', tFetchEnd - tFetchStart);
                         // fetchContentForRecognition now returns the full backend response when available
                         // normalize to `conteudo` (array or object) and extract location metadata
                         let conteudo: any = null;
@@ -162,23 +168,32 @@ export function ImageDecisionModal({
                                     }
                                 } catch (e) { console.debug('[ImageDecisionModal] convertBlockImages error', e); }
                             }
-                            // run conversion but don't block too long — await it to ensure payload includes data urls
+                            // Start conversion in background (non-blocking) — do NOT await here to avoid blocking the critical path
                             try {
-                                await convertBlockImagesToDataUrls(conteudo, 3, 2_500_000);
-                                console.log('[ImageDecisionModal] ✅ Conversão de imagens concluída');
+                                convertBlockImagesToDataUrls(conteudo, 3, 2_500_000)
+                                    .then(() => console.log('[ImageDecisionModal] ✅ Conversão de imagens (background) concluída'))
+                                    .catch((e) => console.debug('[ImageDecisionModal] ⚠️ convert images (background) failed', e));
                             } catch (e) {
-                                console.debug('[ImageDecisionModal] ⚠️ convert images top-level failed', e);
+                                console.debug('[ImageDecisionModal] ⚠️ iniciar conversão em background falhou', e);
                             }
                             // build a payload minimal
                             let preview = imageUri;
+                            // Do not synchronously convert local preview file to base64 (can block). Keep file:// and let renderer handle it.
+                            // Start a non-blocking conversion for later use if desired.
                             try {
                                 if (preview && preview.startsWith && preview.startsWith('file://')) {
-                                    // convert local file to base64 data URL for WebView
-                                    const b64 = await FileSystem.readAsStringAsync(preview, { encoding: 'base64' });
-                                    preview = `data:image/jpeg;base64,${b64}`;
+                                    (async () => {
+                                        try {
+                                            const b64 = await FileSystem.readAsStringAsync(preview, { encoding: 'base64' });
+                                            console.log('[ImageDecisionModal] ℹ️ preview conversion (background) pronta (bytes=', b64.length, ')');
+                                            // Optionally we could update a cache/context here, but keeping non-blocking for now.
+                                        } catch (e) {
+                                            console.debug('[ImageDecisionModal] preview conversion (background) failed', e);
+                                        }
+                                    })();
                                 }
                             } catch (e) {
-                                console.debug('[ImageDecisionModal] preview conversion failed', e);
+                                console.debug('[ImageDecisionModal] preview conversion scheduling failed', e);
                             }
                             // determine anchor metadata based on image source and recognition info
                             let anchorMode: string | undefined = 'auto';
@@ -258,7 +273,8 @@ export function ImageDecisionModal({
 
                             // Inicia prefetch explícito ANTES de setARPayload para dar mais headroom ao download do header
                             try {
-                                console.log('[ImageDecisionModal] ▶️ Iniciando prefetchImagesForPayload ANTES de setARPayload');
+                                const tPrefetchKick = Date.now();
+                                console.log('[ImageDecisionModal] ▶️ Iniciando prefetchImagesForPayload ANTES de setARPayload t_prefetch_kick=', new Date(tPrefetchKick).toISOString());
                                 // kick off prefetch (non-blocking) - context will also run its own prefetch em setPayload
                                 try { prefetchImagesForPayload && prefetchImagesForPayload(payload); } catch (e) { /* swallow */ }
                                 // tenta detectar filename do header (heurística similar ao contexto)
@@ -302,7 +318,8 @@ export function ImageDecisionModal({
 
                                 const cached = await waitForHeader(headerFilename, 1200);
                                 if (cached) {
-                                    console.log('[ImageDecisionModal] ✅ Header cache pronto antes de setARPayload:', headerFilename, headerLocalMap && headerLocalMap[headerFilename]);
+                                    const tCacheReady = Date.now();
+                                    console.log('[ImageDecisionModal] ✅ Header cache pronto antes de setARPayload:', headerFilename, headerLocalMap && headerLocalMap[headerFilename], 't_cache_ready=', new Date(tCacheReady).toISOString(), 'elapsed_ms=', tCacheReady - tPrefetchKick);
                                 } else {
                                     console.log('[ImageDecisionModal] ℹ️ Header cache não pronto em 1200ms, vai registrar payload e navegar de qualquer forma', headerFilename);
                                 }
@@ -311,11 +328,14 @@ export function ImageDecisionModal({
                             }
 
                             // Agora que demos um headstart no download, registra o payload no contexto
-                            console.log('[ImageDecisionModal] ✅ Registrando payload no contexto e navegando para ar-view...');
+                            const tSetPayload = Date.now();
+                            console.log('[ImageDecisionModal] ✅ Registrando payload no contexto e navegando para ar-view... t_set_payload=', new Date(tSetPayload).toISOString(), 'elapsed_ms=', tSetPayload - tFetchEnd);
                             setARPayload(payload);
                             // Fecha o modal ANTES de navegar
                             shouldCancel = true; // vai executar onCancel no finally
+                            const tNav = Date.now();
                             router.push('/_tabs/ar-view');
+                            console.log('[ImageDecisionModal] ▶️ Navegação para /_tabs/ar-view triggered t_nav=', new Date(tNav).toISOString(), 'elapsed_ms=', tNav - tSetPayload);
                         } else {
                             // No content for recognized brand: show the no-content modal with brand and location
                             console.warn('[ImageDecisionModal] ⚠️ Marca reconhecida mas sem conteúdo disponível');
