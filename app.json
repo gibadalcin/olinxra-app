@@ -39,9 +39,8 @@
     },
     "icon": "./assets/images/mini-app.png",
     "splash": {
-      "image": "./assets/images/logo-splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0047AB"
     },
     "runtimeVersion": {
       "policy": "appVersion"
