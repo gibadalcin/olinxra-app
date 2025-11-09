@@ -27,7 +27,6 @@ interface ARPayloadContextType {
     // função para pré-carregar imagens de um payload sem alterar o payload atual
     prefetchImagesForPayload?: (payload: any | null) => void;
     // pré-carrega o header e aguarda até que o filename seja resolvido para um uri local ou até timeout
-    prefetchHeaderAndWait?: (payload: any | null, filename: string | null, timeoutMs?: number) => Promise<boolean>;
 }
 
 const ARPayloadContext = createContext<ARPayloadContextType | undefined>(undefined);
@@ -90,7 +89,7 @@ export function ARPayloadProvider({ children }: { children: ReactNode }) {
 
                     const pushIfImage = (obj: any) => {
                         if (!obj) return;
-                        const url = obj?.signed_url || obj?.signedUrl || obj?.url || obj?.previewDataUrl;
+                        const url = obj?.preview_signed_url || obj?.previewSignedUrl || obj?.signed_url || obj?.signedUrl || obj?.url || obj?.previewDataUrl;
                         if (!url || String(url).startsWith('data:')) return;
                         const filename = obj?.filename || obj?.nome || String(url.split('/').pop());
                         if (entries.find((e) => e.filename === filename)) return;
@@ -232,7 +231,7 @@ export function ARPayloadProvider({ children }: { children: ReactNode }) {
 
                 const pushIfImage = (obj: any) => {
                     if (!obj) return;
-                    const url = obj?.signed_url || obj?.signedUrl || obj?.url || obj?.previewDataUrl;
+                    const url = obj?.preview_signed_url || obj?.previewSignedUrl || obj?.signed_url || obj?.signedUrl || obj?.url || obj?.previewDataUrl;
                     if (!url || String(url).startsWith('data:')) return;
                     const filename = obj?.filename || obj?.nome || String(url.split('/').pop());
                     if (entries.find((e) => e.filename === filename)) return;
