@@ -39,6 +39,7 @@
     },
     "icon": "./assets/images/mini-app.png",
     "splash": {
+      "image": "./assets/images/mini-app.png",
       "resizeMode": "contain",
       "backgroundColor": "#0047AB"
     },
