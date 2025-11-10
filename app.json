@@ -42,9 +42,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#0047AB"
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/0105cf14-9575-4bdf-85df-c494395ed03c"
     }
