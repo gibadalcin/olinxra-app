@@ -41,7 +41,10 @@
     "splash": {
       "image": "./assets/images/logo-splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0047AB"
+      "backgroundColor": "#0047AB",
+      "width": "68%",
+      "maxHeight": 160,
+      "marginTop": 0
     },
     "runtimeVersion": "1.0.0",
     "updates": {
