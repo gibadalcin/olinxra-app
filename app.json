@@ -40,7 +40,8 @@
     "icon": "./assets/images/mini-app.png",
     "splash": {
       "image": "./assets/images/blank-splash.png",
-      "resizeMode": "contain"
+      "resizeMode": "cover",
+      "backgroundColor": "#0047AB"
     },
     "runtimeVersion": "1.0.0",
     "updates": {
