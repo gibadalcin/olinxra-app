@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, Animated, TouchableOpacity, Linking, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import * as FileSystem from 'expo-file-system';
+import { Ionicons, Feather, MaterialCommunityIcons, FontAwesome, Entypo } from '@expo/vector-icons';
 // Alguns métodos do legacy foram marcados como deprecated na nova API.
 // Importamos o legacy se estiver disponível para manter compatibilidade e evitar que a
 // chamada a getInfoAsync lance em runtime em algumas versões do SDK.
@@ -15,7 +16,6 @@ try {
 }
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
-import { Feather, Ionicons } from '@expo/vector-icons';
 import { useARPayload } from '@/context/ARPayloadContext';
 import { dbg } from '../src/utils/debugLog';
 
@@ -149,6 +149,11 @@ export function ContentBlocks({ blocos }: ContentBlocksProps) {
                 {otherBlocks.map((bloco, index) => (
                     <BlockRenderer key={`other-${index}`} bloco={bloco} index={index} />
                 ))}
+                {/* TESTE: Renderização direta de um ícone MaterialCommunityIcons */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', margin: 16 }}>
+                    <Text style={{ marginRight: 8 }}>Teste ícone MaterialCommunityIcons:</Text>
+                    <MaterialCommunityIcons name="whatsapp" size={32} color="#25D366" />
+                </View>
             </ScrollView>
 
             {/* 4️⃣ CAROUSEL (overlay fixo) */}
@@ -357,17 +362,6 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
             }
         })();
     }, [filename, ctxLocal]);
-
-    // Log do src efetivo para debugging rápido
-    React.useEffect(() => {
-        dbg('[HeaderBlock] ℹ️ displayUri atual:', displayUri);
-        dbg('[HeaderBlock] ℹ️ Tipo de fonte:',
-            displayUri?.startsWith('file://') ? 'CACHE LOCAL (melhor)' :
-                displayUri?.startsWith('data:') ? 'PREVIEW BASE64 (rápido)' :
-                    displayUri?.startsWith('http') ? 'URL REMOTA (lento)' :
-                        'DESCONHECIDO'
-        );
-    }, [displayUri]);
 
     const { payload } = useARPayload();
 
@@ -795,76 +789,41 @@ function ButtonBlock({ bloco }: { bloco: any }) {
     const textColor = bloco?.textColor || bloco?.corTexto || '#fff';
 
     // ✅ Resolução dinâmica de ícones usando @expo/vector-icons
-    const iconName = bloco?.icon || bloco?.icone || '';
+    // Usar exatamente o nome do ícone enviado pelo backend
+    // Forçar nome do ícone para minúsculas para garantir compatibilidade
+    const iconName = (bloco?.icon ?? '').toLowerCase();
     const iconInvert = bloco?.icon_invert || false;
 
     // Renderizar ícone dinamicamente - VERSÃO SIMPLIFICADA E DIRETA
     const renderIcon = () => {
         if (!iconName) return null;
-
-        // Mapeamento direto: nome do ícone → (família, nome-nativo)
-        // Prioriza Ionicons que tem mais ícones disponíveis
-        const iconMapping: Record<string, { family: any; name: string }> = {
-            // Ionicons (tem mais variedade)
-            'ticket': { family: Ionicons, name: 'ticket-outline' },
-            'Ticket': { family: Ionicons, name: 'ticket-outline' },
-            'calendar': { family: Ionicons, name: 'calendar-outline' },
-            'Calendar': { family: Ionicons, name: 'calendar-outline' },
-            'phone': { family: Ionicons, name: 'call-outline' },
-            'Phone': { family: Ionicons, name: 'call-outline' },
-            'mail': { family: Ionicons, name: 'mail-outline' },
-            'Mail': { family: Ionicons, name: 'mail-outline' },
-            'email': { family: Ionicons, name: 'mail-outline' },
-            'Email': { family: Ionicons, name: 'mail-outline' },
-            'location': { family: Ionicons, name: 'location-outline' },
-            'Location': { family: Ionicons, name: 'location-outline' },
-            'home': { family: Ionicons, name: 'home-outline' },
-            'Home': { family: Ionicons, name: 'home-outline' },
-            'user': { family: Ionicons, name: 'person-outline' },
-            'User': { family: Ionicons, name: 'person-outline' },
-            'person': { family: Ionicons, name: 'person-outline' },
-            'Person': { family: Ionicons, name: 'person-outline' },
-            'search': { family: Ionicons, name: 'search-outline' },
-            'Search': { family: Ionicons, name: 'search-outline' },
-            'cart': { family: Ionicons, name: 'cart-outline' },
-            'Cart': { family: Ionicons, name: 'cart-outline' },
-            'heart': { family: Ionicons, name: 'heart-outline' },
-            'Heart': { family: Ionicons, name: 'heart-outline' },
-            'star': { family: Ionicons, name: 'star-outline' },
-            'Star': { family: Ionicons, name: 'star-outline' },
-            'info': { family: Ionicons, name: 'information-circle-outline' },
-            'Info': { family: Ionicons, name: 'information-circle-outline' },
-            // Feather (fallback para ícones comuns)
-            'chevron-right': { family: Feather, name: 'chevron-right' },
-            'chevron-left': { family: Feather, name: 'chevron-left' },
-            'check': { family: Feather, name: 'check' },
-            'x': { family: Feather, name: 'x' },
-            'close': { family: Feather, name: 'x' },
-        };
-
-        // Tentar mapeamento direto primeiro
-        const mapped = iconMapping[iconName];
-        if (mapped) {
-            const IconComponent = mapped.family;
-            return <IconComponent name={mapped.name} size={20} color={textColor} style={{ marginHorizontal: 4 }} />;
+        // Lista de famílias conhecidas
+        const iconFamilies = [
+            { key: 'MaterialCommunityIcons', component: MaterialCommunityIcons },
+            { key: 'Ionicons', component: Ionicons },
+            { key: 'Feather', component: Feather },
+            { key: 'FontAwesome', component: FontAwesome },
+            { key: 'Entypo', component: Entypo },
+        ];
+        // Se o backend especificar a família, tenta ela primeiro
+        const preferredFamily = bloco?.iconFamily || bloco?.icon_family;
+        if (preferredFamily) {
+            const found = iconFamilies.find(f => f.key.toLowerCase() === String(preferredFamily).toLowerCase());
+            if (found) {
+                const Comp = found.component as unknown as React.FunctionComponent<any>;
+                return React.createElement(Comp, { name: iconName, size: 20, color: textColor, style: { marginHorizontal: 4 } });
+            }
         }
-
-        // Se não tiver mapeamento, tentar Ionicons com nome lowercase + "-outline"
-        try {
-            const ionName = `${iconName.toLowerCase()}-outline`;
-            return <Ionicons name={ionName as any} size={20} color={textColor} style={{ marginHorizontal: 4 }} />;
-        } catch (e) {
-            // Se falhar, usar emoji como fallback
-            const emojiMap: Record<string, string> = {
-                'ticket': '🎫', 'calendar': '📅', 'phone': '📞',
-                'mail': '✉️', 'email': '✉️', 'location': '📍',
-                'home': '🏠', 'user': '👤', 'person': '👤',
-                'search': '🔍', 'cart': '🛒', 'heart': '❤️',
-                'star': '⭐', 'info': 'ℹ️',
-            };
-            const emoji = emojiMap[iconName.toLowerCase()] || '🎫';
-            return <Text style={{ color: textColor, fontSize: 20, marginHorizontal: 4 }}>{emoji}</Text>;
+        // Se não especificou ou não encontrou, tenta todas as famílias conhecidas
+        for (const fam of iconFamilies) {
+            try {
+                const Comp = fam.component as unknown as React.FunctionComponent<any>;
+                return React.createElement(Comp, { name: iconName, size: 20, color: textColor, style: { marginHorizontal: 4 } });
+            } catch (e) {
+                // Se não existir, tenta próxima família
+            }
         }
+        return null;
     };
 
     const [isOpen, setIsOpen] = React.useState(false); // Inicia FECHADO
@@ -1226,7 +1185,7 @@ const styles = StyleSheet.create({
     carouselTab: {
         position: 'absolute',
         right: 0,
-        top: '20%', // Posiciona no meio da tela verticalmente
+        top: '10%', // Posiciona no meio da tela verticalmente
         backgroundColor: '#3498db',
         paddingVertical: 20,
         paddingHorizontal: 8,
@@ -1266,7 +1225,7 @@ const styles = StyleSheet.create({
     carouselDrawer: {
         position: 'absolute',
         right: 0,
-        bottom: '30%',
+        bottom: '40%',
         width: '85%', // 85% da largura da tela
         backgroundColor: 'rgba(255, 255, 255, 0.2)', // Semi-transparente para efeito glass
         shadowColor: '#000',

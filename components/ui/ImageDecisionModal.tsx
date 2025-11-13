@@ -354,6 +354,22 @@ export function ImageDecisionModal({
                     'Reconhecimento não confiável',
                     ('message' in result && typeof result.message === 'string') ? result.message : 'Nenhum logo reconhecido com confiança suficiente.'
                 );
+                shouldCancel = false;
+            } else if (result.status === 'untrusted') {
+                console.warn('[ImageDecisionModal] ⚠️ Reconhecimento marcado como não confiável pelo backend', result);
+                // Mostrar razão amigável quando disponível, permitir retry
+                // Use any to avoid strict TS type checks on the heterogeneous result object coming from the hook
+                const rAny: any = result;
+                const reason = (rAny && rAny.data && rAny.data.debug_reason) ? rAny.data.debug_reason : (rAny && rAny.message) ? rAny.message : 'O reconhecimento não foi confiável.';
+                Alert.alert(
+                    'Reconhecimento duvidoso',
+                    reason,
+                    [
+                        { text: 'Tentar novamente', onPress: () => { try { handleCompare(); } catch (e) { console.debug('retry failed', e); } } },
+                        { text: 'Cancelar', style: 'cancel' }
+                    ]
+                );
+                shouldCancel = false;
             } else if (result.status === 'not_found') {
                 console.warn('[ImageDecisionModal] ⚠️ Logo não encontrado no banco');
                 // Not recognized at all: try to obtain location for display and show no-content modal

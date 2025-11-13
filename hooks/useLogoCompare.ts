@@ -100,6 +100,14 @@ export async function compareLogo(imageUri: string) {
     ]);
 
     // 5. Tratamento da Resposta
+    // Se o backend retornou e indicou que o resultado não é confiável, pare aqui.
+    if (backendResult && backendResult.trusted === false) {
+        const msg = backendResult.debug_reason ? `Reconhecimento não confiável: ${backendResult.debug_reason}` : 'Reconhecimento não confiável pelo backend.';
+        const result = { status: 'untrusted', data: backendResult, message: msg };
+        console.log('[compareLogo] Resultado final (untrusted):', result);
+        return result;
+    }
+
     if (backendResult && backendResult.found && typeof backendResult.confidence === 'number') {
         if (backendResult.confidence >= SIMILARIDADE_MINIMA) {
             await saveLogoToCache(fileBuffer, backendResult);

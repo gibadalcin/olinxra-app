@@ -913,8 +913,8 @@ export default function ARViewScreen() {
     // Helper: prefere explicitamente a imagem header (subtipo 'header' ou tipo contendo 'topo'),
     // se não existir, cai para a primeira imagem disponível (signed_url > url)
     const findFirstImageUrl = useCallback((p: any): string | null => {
-        if (!p) return null;
 
+        if (!p) return null;
         // Normaliza blocos (pode vir como p.blocos.blocos ou p.blocos ou p.conteudo)
         let blocks: any[] = [];
         if (p.blocos) {
@@ -926,19 +926,14 @@ export default function ARViewScreen() {
         } else if (p.conteudo && Array.isArray(p.conteudo)) {
             blocks = p.conteudo;
         }
-
         if (blocks.length === 0) {
-            console.log('[ARView] findFirstImageUrl: nenhum bloco encontrado');
             return null;
         }
-
-        console.log('[ARView] findFirstImageUrl: encontrados', blocks.length, 'blocos');
 
         // Helper para verificar se URL é válida (HTTP/HTTPS e não gs://)
         const isValidHttpUrl = (url: string) => {
             return url && typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'));
         };
-
         // Helper para verificar se é base64 válido (deve ter vírgula após o cabeçalho)
         const isValidBase64 = (url: string) => {
             if (!url || typeof url !== 'string') return false;
@@ -954,56 +949,34 @@ export default function ARViewScreen() {
             const subtipo = (b.subtipo || b.subType || '').toString().toLowerCase();
             const tipoLabel = (b.tipo || '').toString().toLowerCase();
             if (subtipo === 'header' || tipoLabel.includes('topo') || tipoLabel.includes('header') || tipoLabel.includes('imagem')) {
-                console.log('[ARView] findFirstImageUrl: encontrado bloco header/topo/imagem:', tipoLabel);
-
                 // PRIORIDADE 1: previewDataUrl (base64 - não expira)
                 if (b.previewDataUrl) {
                     if (isValidBase64(b.previewDataUrl)) {
-                        console.log('[ARView] findFirstImageUrl: usando previewDataUrl do header (BASE64 VÁLIDO)');
                         return b.previewDataUrl;
-                    } else {
-                        console.warn('[ARView] ⚠️ previewDataUrl existe mas NÃO é base64 válido!');
-                        console.warn('[ARView] ⚠️ Primeiros 150 chars:', b.previewDataUrl.substring(0, 150));
-                        console.warn('[ARView] ⚠️ Tem vírgula?', b.previewDataUrl.includes(','));
-
-                        // ✅ CORREÇÃO: Se previewDataUrl começa com "data:image/" mas não é base64 válido,
-                        // pode ser uma URL encoded malformada. Ignora e usa signed_url no lugar.
-                        console.warn('[ARView] ⚠️ Ignorando previewDataUrl malformado, tentando signed_url...');
                     }
                 }
-
                 // PRIORIDADE 2: signed_url (pode expirar, mas é HTTP válido)
                 if (isValidHttpUrl(b.signed_url)) {
-                    console.log('[ARView] findFirstImageUrl: usando signed_url do header');
                     return b.signed_url;
                 }
-
                 // PRIORIDADE 3: url (fallback)
                 if (isValidHttpUrl(b.url)) {
-                    console.log('[ARView] findFirstImageUrl: usando url do header');
                     return b.url;
                 }
-
                 // carousel/itens dentro do header
                 if (Array.isArray(b.items)) {
                     for (const it of b.items) {
                         if (!it) continue;
-
                         // PRIORIDADE 1: previewDataUrl (base64)
                         if (isValidBase64(it.previewDataUrl)) {
-                            console.log('[ARView] findFirstImageUrl: usando previewDataUrl de item do header (BASE64)');
                             return it.previewDataUrl;
                         }
-
                         // PRIORIDADE 2: signed_url
                         if (isValidHttpUrl(it.signed_url)) {
-                            console.log('[ARView] findFirstImageUrl: usando signed_url de item do header');
                             return it.signed_url;
                         }
-
                         // PRIORIDADE 3: url
                         if (isValidHttpUrl(it.url)) {
-                            console.log('[ARView] findFirstImageUrl: usando url de item do header');
                             return it.url;
                         }
                     }
@@ -1012,66 +985,46 @@ export default function ARViewScreen() {
         }
 
         // 2) fallback: primeira imagem encontrada (prioriza base64)
-        console.log('[ARView] findFirstImageUrl: procurando fallback em todos os blocos');
         for (const b of blocks) {
             if (!b) continue;
-
             // PRIORIDADE 1: previewDataUrl (base64)
             if (isValidBase64(b.previewDataUrl)) {
-                console.log('[ARView] findFirstImageUrl: usando previewDataUrl do bloco fallback (BASE64)');
                 return b.previewDataUrl;
             }
-
             // PRIORIDADE 2: signed_url
             if (isValidHttpUrl(b.signed_url)) {
-                console.log('[ARView] findFirstImageUrl: usando signed_url do bloco fallback');
                 return b.signed_url;
             }
-
             // PRIORIDADE 3: url
             if (isValidHttpUrl(b.url)) {
-                console.log('[ARView] findFirstImageUrl: usando url do bloco fallback');
                 return b.url;
             }
-
             // Dentro de items (carousel)
             if (Array.isArray(b.items)) {
                 for (const it of b.items) {
                     if (!it) continue;
-
                     // PRIORIDADE 1: previewDataUrl (base64)
                     if (isValidBase64(it.previewDataUrl)) {
-                        console.log('[ARView] findFirstImageUrl: usando previewDataUrl de item fallback (BASE64)');
                         return it.previewDataUrl;
                     }
-
                     // PRIORIDADE 2: signed_url
                     if (isValidHttpUrl(it.signed_url)) {
-                        console.log('[ARView] findFirstImageUrl: usando signed_url de item fallback');
                         return it.signed_url;
                     }
-
                     // PRIORIDADE 3: url
                     if (isValidHttpUrl(it.url)) {
-                        console.log('[ARView] findFirstImageUrl: usando url de item fallback');
                         return it.url;
                     }
                 }
             }
         }
-
-        console.log('[ARView] findFirstImageUrl: nenhuma URL válida encontrada');
         return null;
     }, []);
 
     // --- Renderização ---
 
     // Efeito para referenciar findFirstImageUrl (evita warning de unused)
-    useEffect(() => {
-        try {
-            console.log('[ARView] debug: findFirstImageUrl defined?', typeof findFirstImageUrl === 'function');
-        } catch (e) { }
-    }, []);
+    // (Removido log de debug de findFirstImageUrl)
 
     // Estado 1: Carregamento Inicial (enquanto payload não chega)
     if (loading) {
@@ -1080,36 +1033,29 @@ export default function ARViewScreen() {
 
     // ✅ NOVO: Estado 2: Conteúdo após fechar AR
     if (showContent && payload) {
-        console.log('[ARView] 📋 Renderizando tela de conteúdo...');
-        console.log('[ARView] 📋 payload existe:', !!payload);
-        console.log('[ARView] 📋 payload.blocos:', payload.blocos ? 'EXISTE' : 'NULL');
 
         // Extrai blocos do payload
         let blocos: any[] = [];
         if (payload.blocos) {
             if (Array.isArray(payload.blocos)) {
                 blocos = payload.blocos;
-                console.log('[ARView] 📋 Blocos extraídos diretamente (array):', blocos.length);
             } else if (payload.blocos.blocos && Array.isArray(payload.blocos.blocos)) {
                 blocos = payload.blocos.blocos;
-                console.log('[ARView] 📋 Blocos extraídos de .blocos.blocos:', blocos.length);
             }
         } else if (payload.conteudo && Array.isArray(payload.conteudo)) {
             blocos = payload.conteudo;
-            console.log('[ARView] 📋 Blocos extraídos de .conteudo:', blocos.length);
         }
 
-        console.log('[ARView] 📋 Total de blocos a renderizar:', blocos.length);
-        blocos.forEach((b, i) => {
-            console.log(`[ARView] 📋 Bloco ${i}: tipo="${b?.tipo}", subtipo="${b?.subtipo}"`);
-        });
-
+        // Gera uma chave única para forçar atualização do ContentBlocks ao trocar payload
+        const headerKey =
+            (blocos[0]?.filename || blocos[0]?.nome || String((blocos[0]?.signed_url || blocos[0]?.url || blocos[0]?.previewDataUrl || '').split('/').pop())) ||
+            (payload.nome_marca || '') + '_' + (payload.previewImage ? payload.previewImage.length : 'noimg');
         return (
             <>
                 <CustomHeader title="Conteúdo" />
                 <View style={styles.contentContainer}>
                     {/* Renderiza blocos de conteúdo */}
-                    <ContentBlocks blocos={blocos} />
+                    <ContentBlocks blocos={blocos} key={headerKey} />
                 </View>
             </>
         );
