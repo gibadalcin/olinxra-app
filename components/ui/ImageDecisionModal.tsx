@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { Modal, View, Image, StyleSheet, Pressable, Text, Alert } from 'react-native';
-import { Colors } from '@/constants/Colors';
+import { Colors } from '../../constants/Colors';
 import { useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { saveToGallery } from '@/hooks/useSaveToGallery';
+import { saveToGallery } from '../../hooks/useSaveToGallery';
 import LoadingWithTips from './LoadingWithTips';
-import { compareLogo } from '@/hooks/useLogoCompare';
+import { compareLogo } from '../../hooks/useLogoCompare';
 import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
-import { useARPayload } from '@/context/ARPayloadContext'; // ✅ Usar Context ao invés de módulo
-import { useARContent } from '@/hooks/useARContent';
+import { useARPayload } from '../../context/ARPayloadContext'; // ✅ Usar Context ao invés de módulo
+import { useARContent } from '../../hooks/useARContent';
 import { NoContentToDisplayModal } from './NoContentToDisplay';
 
 type Props = {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
-import { Colors } from '@/constants/Colors';
+import { Colors } from '../constants/Colors';
 
 type Props = {
     title: string;
@@ -13,7 +13,7 @@ export function CustomHeader({ title, transparent = false }: Props) {
         <View style={[styles.customHeader, transparent ? styles.transparent : null]}>
             <View style={styles.customHeaderContent}>
                 <Image
-                    source={require('@/assets/images/adaptive-icon-w.png')}
+                    source={require('../assets/images/adaptive-icon-w.png')}
                     style={styles.headerIcon}
                 />
                 <View>

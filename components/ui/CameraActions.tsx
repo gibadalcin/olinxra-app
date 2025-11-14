@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { ThemedText } from '@/components/ThemedText';
-import { Colors } from '@/constants/Colors';
+import { ThemedText } from '../../components/ThemedText';
+import { Colors } from '../../constants/Colors';
 
 const ICON_SIZE = 40;
 const OUTER_CIRCLE_SIZE = 72;

@@ -1,7 +1,7 @@
 import { Text, StyleSheet, Pressable, View, AppState, AppStateStatus } from "react-native";
-import { Colors } from '@/constants/Colors';
-import { ThemedView } from "@/components/ThemedView";
-import CustomHeader from '@/components/CustomHeader';
+import { Colors } from '../../constants/Colors';
+import { ThemedView } from "../../components/ThemedView";
+import CustomHeader from '../../components/CustomHeader';
 import { useState, useEffect, useRef } from 'react';
 import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';

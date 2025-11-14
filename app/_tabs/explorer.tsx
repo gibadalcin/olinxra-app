@@ -1,6 +1,6 @@
 import { View, Text, Alert } from "react-native";
 import React, { useEffect, useState, useCallback } from 'react';
-import PermissionRequest from '@/components/ui/PermissionRequest';
+import PermissionRequest from '../../components/ui/PermissionRequest';
 import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';

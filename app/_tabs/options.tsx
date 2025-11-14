@@ -1,10 +1,10 @@
-import { ThemedView } from "@/components/ThemedView";
-import { ThemedText } from "@/components/ThemedText";
-import { Colors } from "@/constants/Colors";
-import { useCaptureSettings } from '@/context/CaptureSettingsContext';
+import { ThemedView } from "../../components/ThemedView";
+import { ThemedText } from "../../components/ThemedText";
+import { Colors } from "../../constants/Colors";
+import { useCaptureSettings } from '../../context/CaptureSettingsContext';
 import { Switch, StyleSheet, Pressable, Alert } from 'react-native';
-import CustomHeader from '@/components/CustomHeader';
-import { clearAllCache } from '@/utils/contentCache';
+import CustomHeader from '../../components/CustomHeader';
+import { clearAllCache } from '../../utils/contentCache';
 import { useState } from 'react';
 
 const headerTitle = "Opções de configuração";

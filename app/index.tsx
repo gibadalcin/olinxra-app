@@ -2,8 +2,8 @@ import React, { useEffect, useState } from "react";
 import { View, Animated, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ThemedText } from "@/components/ThemedText";
-import { Colors } from "@/constants/Colors";
+import { ThemedText } from "../components/ThemedText";
+import { Colors } from "../constants/Colors";
 
 // Esconde o cabeçalho da Stack para esta página
 export const options = {
@@ -14,7 +14,7 @@ export default function Splash() {
     const [progress, setProgress] = useState(0);
     const fadeAnim = useState(new Animated.Value(1))[0];
     const router = useRouter();
-    const logo = require("@/assets/images/logo-splash.png");
+    const logo = require("../assets/images/logo-splash.png");
 
     useEffect(() => {
         // 1. Variável de controle (deve ser 'let' e inicializada)

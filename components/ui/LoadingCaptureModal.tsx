@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, View, StyleSheet, ActivityIndicator, Text, Button } from 'react-native';
-import { Colors } from '@/constants/Colors';
+import { Colors } from '../../constants/Colors';
 
 interface LoadingCaptureModalProps {
     visible: boolean;

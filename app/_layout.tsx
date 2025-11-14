@@ -1,18 +1,18 @@
 import { Stack } from "expo-router";
-import { CaptureSettingsProvider } from '@/context/CaptureSettingsContext';
-import { ARPayloadProvider } from '@/context/ARPayloadContext';
-import { useHideNavigationBar } from "@/hooks/useNavigationBar";
+import { CaptureSettingsProvider } from '../context/CaptureSettingsContext';
+import { ARPayloadProvider } from '../context/ARPayloadContext';
+import { useHideNavigationBar } from "../hooks/useNavigationBar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from 'react';
-import { probeARSupport } from '@/hooks/useARSupport';
+import { probeARSupport } from '../hooks/useARSupport';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'react-native';
 
 // 🛠️ Expõe comandos de desenvolvimento no console
 if (__DEV__) {
-    import('@/utils/devCommands').then((DevCommands) => {
+    import('../utils/devCommands').then((DevCommands) => {
         (globalThis as any).dev = DevCommands;
         console.log('');
         console.log('🛠️  ========================================');

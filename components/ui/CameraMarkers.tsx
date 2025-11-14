@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors } from '@/constants/Colors';
+import { Colors } from '../../constants/Colors';
 
 const MARKER_LENGTH = 80;
 const MARKER_BORDER = 1;

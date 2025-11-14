@@ -16,7 +16,7 @@ try {
 }
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
-import { useARPayload } from '@/context/ARPayloadContext';
+import { useARPayload } from '../context/ARPayloadContext';
 import { dbg } from '../src/utils/debugLog';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

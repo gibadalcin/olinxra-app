@@ -2,12 +2,12 @@ import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { View, Text, StyleSheet, Linking, Alert, Platform, AppState, AppStateStatus } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 // import { API_CONFIG } from '../../config/api'; // removido - não usado neste arquivo
-import { useARPayload } from '@/context/ARPayloadContext'; // ✅ Usar Context
-import { setRestartCaptureOnReturn } from '@/utils/lastARContent';
-import CustomHeader from '@/components/CustomHeader';
-import { isARActive, isSameARModel, activateAR, deactivateAR } from '@/utils/arGate';
-import { ContentBlocks } from '@/components/ContentBlocks'; // ✅ Componente de blocos de conteúdo
-import LoadingWithTips from '@/components/ui/LoadingWithTips'; // ✅ Loader com dicas
+import { useARPayload } from '../../context/ARPayloadContext'; // ✅ Usar Context
+import { setRestartCaptureOnReturn } from '../../utils/lastARContent';
+import CustomHeader from '../../components/CustomHeader';
+import { isARActive, isSameARModel, activateAR, deactivateAR } from '../../utils/arGate';
+import { ContentBlocks } from '../../components/ContentBlocks'; // ✅ Componente de blocos de conteúdo
+import LoadingWithTips from '../../components/ui/LoadingWithTips'; // ✅ Loader com dicas
 
 
 
@@ -48,7 +48,7 @@ export default function ARViewScreen() {
     const glbGeneratedRef = useRef(false); // Flag para saber se já gerou GLB nesta sessão
     const glbGenerationInProgressRef = useRef(false); // Flag para saber se está gerando GLB agora
     const lastPayloadRef = useRef<any>(null); // ✅ Armazena chave do payload anterior
-    const closingNavRef = useRef(false); // ✅ Bloqueia efeitos automáticos durante navegação de saída
+    const closingNavRef = useRef(false); // ✅ Bloqueia efeitos automát../..s durante navegação de saída
     const autoGenTriggeredRef = useRef(false); // ✅ Evita disparo duplo de geração para o mesmo payload
     const generationScheduledRef = useRef(false); // ✅ Evita agendar handleVerEmRA mais de uma vez
 

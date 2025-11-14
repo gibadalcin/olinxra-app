@@ -1,9 +1,9 @@
 import { Tabs } from "expo-router";
-import CustomTabBar from "@/components/CustomTabBar";
-import { useHideNavigationBar } from '@/hooks/useNavigationBar';
+import CustomTabBar from "../../components/CustomTabBar";
+import { useHideNavigationBar } from '../../hooks/useNavigationBar';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { ThemedView } from '@/components/ThemedView';
-import { Colors } from "@/constants/Colors";
+import { ThemedView } from '../../components/ThemedView';
+import { Colors } from "../../constants/Colors";
 
 export default function TabLayout() {
     useHideNavigationBar();

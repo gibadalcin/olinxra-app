@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { ThemedView } from '@/components/ThemedView';
+import { ThemedView } from '../../components/ThemedView';
 import { Image } from 'expo-image';
 import type { ARPreviewProps } from './types';
 
@@ -13,7 +13,7 @@ export default function ARPreviewViewer({ html, baseUrl, webRef, onMessageHandle
             <View style={styles.customHeader}>
                 <View style={styles.customHeaderContent}>
                     <Image
-                        source={require('@/assets/images/adaptive-icon-w.png')}
+                        source={require('../assets/images/adaptive-icon-w.png')}
                         style={styles.headerIcon}
                     />
                     <View>

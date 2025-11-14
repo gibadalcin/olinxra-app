@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Button, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ThemedText } from '@/components/ThemedText';
+import { ThemedText } from '../../components/ThemedText';
 import { Image } from 'expo-image';
-import { Colors } from '@/constants/Colors';
+import { Colors } from '../../constants/Colors';
 
 type PermissionRequestProps = {
     onRequestPermission: () => void;

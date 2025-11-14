@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useARPayload } from '@/context/ARPayloadContext';
+import { useARPayload } from '../context/ARPayloadContext';
 import { API_CONFIG } from '../config/api';
 import { getCachedContent, saveCachedContent, cleanExpiredCache } from '../utils/contentCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';

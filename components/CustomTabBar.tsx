@@ -5,7 +5,7 @@ import { useRouter, useSegments } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { ThemedView } from "./ThemedView";
 import { ThemedText } from "./ThemedText";
-import { Colors } from "@/constants/Colors";
+import { Colors } from "../constants/Colors";
 
 const icons = [
     { name: "camera", label: "Capturar", route: "/_tabs/recognizer", family: Ionicons },

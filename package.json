@@ -54,6 +54,8 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@react-native-community/cli": "latest",
+    "@react-native/metro-config": "^0.82.1",
     "@types/react": "~19.1.10",
     "@types/uuid": "^10.0.0",
     "concurrently": "^8.2.2",

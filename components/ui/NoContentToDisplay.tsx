@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, View, StyleSheet, Text, Button } from 'react-native';
-import { Colors } from '@/constants/Colors';
+import { Colors } from '../../constants/Colors';
 import { Image } from 'expo-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
