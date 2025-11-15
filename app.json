@@ -1,13 +1,13 @@
 {
   "expo": {
     "orientation": "portrait",
-    "name": "OlinxRA",
-    "slug": "olinxra-app",
-    "scheme": "olinxra-app",
+    "name": "olinxplus",
+    "slug": "olinxplus-app",
+    "scheme": "olinxplus-app",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
     "android": {
-      "package": "com.olinxra.app",
+      "package": "com.olinxplus.app",
       "versionCode": 1,
       "permissions": [
         "READ_EXTERNAL_STORAGE",

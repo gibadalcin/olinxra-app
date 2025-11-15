@@ -141,10 +141,15 @@ export function useARContent() {
     // Limpar cache expirado em background (não bloqueia)
     cleanExpiredCache().catch(() => { });
 
+    // Normalização do nome da marca para evitar falhas de correspondência
+    let nomeMarcaNormalizado = (nome_marca || '').trim().toLowerCase();
+    // Adicione aqui outras regras de normalização se necessário
+    console.log('[useARContent] 🚩 nome_marca original:', nome_marca);
+    console.log('[useARContent] 🚩 nome_marca normalizado:', nomeMarcaNormalizado);
     try {
       // 0) Verificar cache primeiro (super rápido)
       const cacheStart = performance.now();
-      const cachedResult = await getCachedContent(nome_marca, lat, lon);
+      const cachedResult = await getCachedContent(nomeMarcaNormalizado, lat, lon);
       console.log(`[useARContent] ⏱️ Cache check: ${((performance.now() - cacheStart) / 1000).toFixed(2)}s`);
 
       if (cachedResult) {
@@ -154,7 +159,7 @@ export function useARContent() {
         if (hasInvalidGlbs) {
           console.warn('[useARContent] ⚠️ Cache tem GLBs sem signed_url, forçando atualização...');
           // Invalidar cache e buscar novamente
-          const key = `@ar_content_cache_${nome_marca}_${Math.round(lat * 100) / 100}_${Math.round(lon * 100) / 100}`;
+          const key = `@ar_content_cache_${nomeMarcaNormalizado}_${Math.round(lat * 100) / 100}_${Math.round(lon * 100) / 100}`;
           await AsyncStorage.removeItem(key).catch(() => { });
         } else {
           console.log('[useARContent] ✅ Usando cache');
@@ -172,14 +177,16 @@ export function useARContent() {
       updateStage('Buscando conteúdo...');
       const smartStart = performance.now();
       console.log('[useARContent] 🔔 smartContent REQUEST START:', new Date().toISOString());
-      const smartResult = await fetchSmartContent(nome_marca, lat, lon);
+      console.log('[useARContent] 🔔 smartContent BODY:', { nome_marca: nomeMarcaNormalizado, latitude: lat, longitude: lon });
+      const smartResult = await fetchSmartContent(nomeMarcaNormalizado, lat, lon);
       const smartEnd = performance.now();
       console.log('[useARContent] 🔔 smartContent REQUEST END:', new Date().toISOString(), `duration_s=${((smartEnd - smartStart) / 1000).toFixed(2)}`);
+      console.log('[useARContent] 🔔 smartContent RESPONSE:', smartResult);
 
       if (smartResult && smartResult.conteudo) {
         // iniciar prefetch de imagens o quanto antes (não bloqueante)
         try { prefetchImagesForPayload && prefetchImagesForPayload(smartResult); } catch (e) { }
-        await saveCachedContent(nome_marca, lat, lon, smartResult);
+        await saveCachedContent(nomeMarcaNormalizado, lat, lon, smartResult);
         console.log(`[useARContent] ⏱️ Total: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
         setConteudo(smartResult.conteudo);
         setLoadingStage('');
@@ -191,13 +198,15 @@ export function useARContent() {
       updateStage('Buscando conteúdo próximo...');
       const consultaStart = performance.now();
       console.log('[useARContent] 🔔 consultaHelper REQUEST START:', new Date().toISOString());
-      const consulta = await fetchConsultaHelper(nome_marca, lat, lon, options.initialRadius);
+      console.log('[useARContent] 🔔 consultaHelper BODY:', { nome_marca: nomeMarcaNormalizado, latitude: lat, longitude: lon, radius: options.initialRadius });
+      const consulta = await fetchConsultaHelper(nomeMarcaNormalizado, lat, lon, options.initialRadius);
       const consultaEnd = performance.now();
       console.log('[useARContent] 🔔 consultaHelper REQUEST END:', new Date().toISOString(), `duration_s=${((consultaEnd - consultaStart) / 1000).toFixed(2)}`);
+      console.log('[useARContent] 🔔 consultaHelper RESPONSE:', consulta);
 
       if (consulta && consulta.conteudo) {
         try { prefetchImagesForPayload && prefetchImagesForPayload(consulta); } catch (e) { }
-        await saveCachedContent(nome_marca, lat, lon, consulta);
+        await saveCachedContent(nomeMarcaNormalizado, lat, lon, consulta);
         console.log(`[useARContent] ⏱️ Total: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
         setConteudo(consulta.conteudo);
         setLoadingStage('');
@@ -210,13 +219,15 @@ export function useARContent() {
         updateStage(`Expandindo busca (raio ${r}m)...`);
         const radiusStart = performance.now();
         console.log('[useARContent] 🔔 fetchByRadius REQUEST START:', new Date().toISOString(), `radius=${r}`);
-        const resp = await fetchByRadius(nome_marca, lat, lon, r);
+        console.log('[useARContent] 🔔 fetchByRadius BODY:', { nome_marca: nomeMarcaNormalizado, latitude: lat, longitude: lon, radius: r });
+        const resp = await fetchByRadius(nomeMarcaNormalizado, lat, lon, r);
         const radiusEnd = performance.now();
         console.log('[useARContent] 🔔 fetchByRadius REQUEST END:', new Date().toISOString(), `radius=${r}`, `duration_s=${((radiusEnd - radiusStart) / 1000).toFixed(2)}`);
+        console.log('[useARContent] 🔔 fetchByRadius RESPONSE:', resp);
 
         if (resp && resp.conteudo) {
           try { prefetchImagesForPayload && prefetchImagesForPayload(resp); } catch (e) { }
-          await saveCachedContent(nome_marca, lat, lon, resp);
+          await saveCachedContent(nomeMarcaNormalizado, lat, lon, resp);
           console.log(`[useARContent] ⏱️ Total: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
           setConteudo(resp.conteudo);
           setLoadingStage('');
@@ -246,13 +257,15 @@ export function useARContent() {
             if (!it.v) continue;
             updateStage(`Buscando em ${it.v}...`);
             const regionStart = performance.now();
-            const regionResp = await fetchByRegion(nome_marca, it.t, it.v);
+            console.log('[useARContent] 🔔 fetchByRegion BODY:', { nome_marca: nomeMarcaNormalizado, tipo_regiao: it.t, nome_regiao: it.v });
+            const regionResp = await fetchByRegion(nomeMarcaNormalizado, it.t, it.v);
             console.log(`[useARContent] ⏱️ Region ${it.t}/${it.v}: ${((performance.now() - regionStart) / 1000).toFixed(2)}s`);
+            console.log('[useARContent] 🔔 fetchByRegion RESPONSE:', regionResp);
 
             if (regionResp && regionResp.blocos && regionResp.blocos.length) {
               try { prefetchImagesForPayload && prefetchImagesForPayload(regionResp); } catch (e) { }
               const normalized = { conteudo: regionResp.blocos, nome_regiao: regionResp.nome_regiao, tipo_regiao: regionResp.tipo_regiao };
-              await saveCachedContent(nome_marca, lat, lon, normalized);
+              await saveCachedContent(nomeMarcaNormalizado, lat, lon, normalized);
               console.log(`[useARContent] ⏱️ Total: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
               setConteudo(regionResp.blocos);
               setLoadingStage('');

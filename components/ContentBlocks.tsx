@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, Animated, TouchableOpacity, Linking, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import * as FileSystem from 'expo-file-system';
-import { Ionicons, Feather, MaterialCommunityIcons, FontAwesome, Entypo } from '@expo/vector-icons';
 // Alguns métodos do legacy foram marcados como deprecated na nova API.
 // Importamos o legacy se estiver disponível para manter compatibilidade e evitar que a
 // chamada a getInfoAsync lance em runtime em algumas versões do SDK.
@@ -16,7 +15,20 @@ try {
 }
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
-import { useARPayload } from '../context/ARPayloadContext';
+import {
+    Ionicons,
+    Feather,
+    MaterialCommunityIcons,
+    FontAwesome,
+    AntDesign,
+    Entypo,
+    Fontisto,
+    Foundation,
+    Octicons,
+    SimpleLineIcons,
+    EvilIcons
+} from '@expo/vector-icons';
+import { useARPayload } from '@/context/ARPayloadContext';
 import { dbg } from '../src/utils/debugLog';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -228,6 +240,16 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
     const [imageAspectRatio, setImageAspectRatio] = React.useState<number>(16 / 9);
     const [localUri, setLocalUri] = React.useState<string | null>(null);
     const [imageLoaded, setImageLoaded] = React.useState<boolean>(false);
+    // Removida duplicidade: displayUri/setDisplayUri já será declarado após initialSrc
+
+    // ...
+    // ...
+
+    // Limpa localUri e imageLoaded ao mudar bloco (nova marca)
+    React.useEffect(() => {
+        setLocalUri(null);
+        setImageLoaded(false);
+    }, [bloco]);
 
     // Preferir mapa de URIs locais provido pelo contexto. Isso garante que
     // o Header passe a usar o arquivo local assim que o contexto o baixar,
@@ -236,6 +258,30 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
 
     const filename = bloco?.filename || bloco?.nome || String((imageUrl || '').split('/').pop());
     const ctxLocal = headerLocalMap?.[filename] || externalLocalHeaderUri || null;
+    let previewCandidate: string | null = null;
+    // Se o próprio bloco não tiver previewDataUrl, tentar aproveitar preview de items (carousel)
+    if (typeof bloco?.previewDataUrl === 'string' && bloco.previewDataUrl.startsWith('data:image') && bloco.previewDataUrl.includes(',')) {
+        previewCandidate = bloco.previewDataUrl;
+    } else if (Array.isArray(bloco?.items)) {
+        for (const it of bloco.items) {
+            if (typeof it?.previewDataUrl === 'string' && it.previewDataUrl.startsWith('data:image') && it.previewDataUrl.includes(',')) {
+                previewCandidate = it.previewDataUrl;
+                break;
+            }
+        }
+    }
+    // Helper: valida se previewDataUrl é um data URI base64 utilizável
+    // Helper: valida se previewDataUrl é um data URI base64 utilizável
+    // (mantém apenas uma instância de isValidBase64 e previewCandidate)
+    // Estado inicial: mostrar preview (base64) se válido, caso contrário usar URL remota
+    const initialSrc = previewCandidate || bloco?.previewDataUrl || imageUrl;
+    const [displayUri, setDisplayUri] = React.useState<string>(ctxLocal || localUri || initialSrc || '');
+    // Limpa displayUri, localUri e imageLoaded ao mudar filename (nova imagem topo)
+    React.useEffect(() => {
+        setDisplayUri(initialSrc || '');
+        setLocalUri(null);
+        setImageLoaded(false);
+    }, [filename]);
 
     // para medir tempos: quando o HeaderBlock monta e quando encontra URI local
     const [mountedAt] = React.useState<number>(() => Date.now());
@@ -260,21 +306,13 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
     // 1. Cache local (file://) - melhor performance
     // 2. Preview base64 (data:) - carregamento instantâneo
     // 3. URL remota (https://) - fallback final
-    // Helper: valida se previewDataUrl é um data URI base64 utilizável
-    const isValidBase64 = (url: string | null | undefined) => {
-        if (!url || typeof url !== 'string') return false;
-        if (!url.startsWith('data:image')) return false;
-        // base64 válido tem vírgula separando header e payload
-        return url.includes(',') && url.indexOf(',') < 150;
-    };
 
     // Se o próprio bloco não tiver previewDataUrl, tentar aproveitar preview de items (carousel)
-    let previewCandidate: string | null = null;
-    if (isValidBase64(bloco?.previewDataUrl)) {
+    if (typeof bloco?.previewDataUrl === 'string' && bloco.previewDataUrl.startsWith('data:image') && bloco.previewDataUrl.includes(',')) {
         previewCandidate = bloco.previewDataUrl;
     } else if (Array.isArray(bloco?.items)) {
         for (const it of bloco.items) {
-            if (isValidBase64(it?.previewDataUrl)) {
+            if (typeof it?.previewDataUrl === 'string' && it.previewDataUrl.startsWith('data:image') && it.previewDataUrl.includes(',')) {
                 previewCandidate = it.previewDataUrl;
                 break;
             }
@@ -282,10 +320,7 @@ function HeaderBlock({ bloco, localHeaderUri: externalLocalHeaderUri }: { bloco:
     }
 
     // Estado inicial: mostrar preview (base64) se válido, caso contrário usar URL remota
-    const initialSrc = previewCandidate || bloco?.previewDataUrl || imageUrl;
-    const [displayUri, setDisplayUri] = React.useState<string>(
-        ctxLocal || localUri || initialSrc || ''
-    );
+    // (mantém apenas uma instância de initialSrc e previewCandidate)
 
     // ✅ UPGRADE PROGRESSIVO: Se cache local aparecer, upgradar para ele (melhor qualidade/performance)
     React.useEffect(() => {
@@ -788,42 +823,46 @@ function ButtonBlock({ bloco }: { bloco: any }) {
         : (bloco?.backgroundColor || colorMap[bloco?.color?.toLowerCase()] || bloco?.cor || '#e74c3c');
     const textColor = bloco?.textColor || bloco?.corTexto || '#fff';
 
-    // ✅ Resolução dinâmica de ícones usando @expo/vector-icons
-    // Usar exatamente o nome do ícone enviado pelo backend
-    // Forçar nome do ícone para minúsculas para garantir compatibilidade
-    const iconName = (bloco?.icon ?? '').toLowerCase();
+    // Resolução dinâmica de ícones usando @expo/vector-icons
+    const iconName = (bloco?.icon || bloco?.icone || '').toLowerCase();
     const iconInvert = bloco?.icon_invert || false;
 
-    // Renderizar ícone dinamicamente - VERSÃO SIMPLIFICADA E DIRETA
+    // Renderizar ícone dinamicamente, priorizando MaterialCommunityIcons
     const renderIcon = () => {
         if (!iconName) return null;
-        // Lista de famílias conhecidas
-        const iconFamilies = [
-            { key: 'MaterialCommunityIcons', component: MaterialCommunityIcons },
-            { key: 'Ionicons', component: Ionicons },
-            { key: 'Feather', component: Feather },
-            { key: 'FontAwesome', component: FontAwesome },
-            { key: 'Entypo', component: Entypo },
+
+        // Lista de famílias em ordem de prioridade
+        const families = [
+            MaterialCommunityIcons,
+            Ionicons,
+            Feather,
+            FontAwesome,
+            AntDesign,
+            Entypo,
+            Fontisto,
+            Foundation,
+            Octicons,
+            SimpleLineIcons,
+            EvilIcons,
         ];
-        // Se o backend especificar a família, tenta ela primeiro
-        const preferredFamily = bloco?.iconFamily || bloco?.icon_family;
-        if (preferredFamily) {
-            const found = iconFamilies.find(f => f.key.toLowerCase() === String(preferredFamily).toLowerCase());
-            if (found) {
-                const Comp = found.component as unknown as React.FunctionComponent<any>;
-                return React.createElement(Comp, { name: iconName, size: 20, color: textColor, style: { marginHorizontal: 4 } });
-            }
-        }
-        // Se não especificou ou não encontrou, tenta todas as famílias conhecidas
-        for (const fam of iconFamilies) {
+
+        // Tenta renderizar o ícone em cada família
+        for (const Family of families) {
             try {
-                const Comp = fam.component as unknown as React.FunctionComponent<any>;
-                return React.createElement(Comp, { name: iconName, size: 20, color: textColor, style: { marginHorizontal: 4 } });
+                // Algumas famílias usam nomes diferentes, mas tentamos direto
+                return <Family name={iconName} size={20} color={textColor} style={{ marginHorizontal: 4 }} />;
             } catch (e) {
-                // Se não existir, tenta próxima família
+                // Se não existir, ignora e tenta próxima família
             }
         }
-        return null;
+
+        // Fallback: tenta Ionicons com nome original
+        try {
+            return <Ionicons name={iconName as any} size={20} color={textColor} style={{ marginHorizontal: 4 }} />;
+        } catch (e) { }
+
+        // Fallback final: emoji
+        return <Text style={{ color: textColor, fontSize: 20, marginHorizontal: 4 }}>🎫</Text>;
     };
 
     const [isOpen, setIsOpen] = React.useState(false); // Inicia FECHADO
