@@ -1,4 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
+import { useLocalSearchParams } from "expo-router";
+import { useSplashFade } from "../../../context/SplashFadeContext";
 import { useCaptureSettings } from '../../../context/CaptureSettingsContext';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, Dimensions } from "react-native";
 import CustomHeader from '../../../components/CustomHeader';
@@ -28,6 +30,8 @@ const headerTitle = "Capturar Logomarca";
 type ImageSourceType = 'camera' | 'gallery' | null;
 
 export default function RecognizerHome() {
+            const { setCameraReady } = useSplashFade();
+        const params = useLocalSearchParams();
     const { showOrientation } = useCaptureSettings();
     // Tipagem correta para useRef (não é preciso usar 'any' para a CameraView)
     const cameraRef = useRef<CameraView>(null);
@@ -78,6 +82,13 @@ export default function RecognizerHome() {
     useEffect(() => {
         handlePermissions();
     }, [handlePermissions]);
+
+    // Notifica o Splash global quando a câmera estiver pronta
+    useEffect(() => {
+        if (hasPermission === true && cameraRef.current) {
+            setCameraReady(true);
+        }
+    }, [hasPermission, cameraRef, setCameraReady]);
 
     const openGallery = useCallback(async () => {
         if (isProcessing) return;

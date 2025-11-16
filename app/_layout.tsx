@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import { CaptureSettingsProvider } from '../context/CaptureSettingsContext';
 import { ARPayloadProvider } from '../context/ARPayloadContext';
+import { SplashFadeProvider } from '../context/SplashFadeContext';
 import { useHideNavigationBar } from "../hooks/useNavigationBar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
@@ -9,6 +10,7 @@ import { probeARSupport } from '../hooks/useARSupport';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'react-native';
+import GlobalSplashOverlay from './GlobalSplashOverlay';
 
 // 🛠️ Expõe comandos de desenvolvimento no console
 if (__DEV__) {
@@ -99,17 +101,21 @@ export default function Layout() {
 
     // Wrapper de gestos para acessibilidade e navegação
     return (
-        <CaptureSettingsProvider>
-            <ARPayloadProvider>
-                <GestureHandlerRootView style={{ flex: 1 }}>
-                    <StatusBar hidden />
-                    <Stack
-                        screenOptions={{
-                            headerShown: false,
-                        }}
-                    />
-                </GestureHandlerRootView>
-            </ARPayloadProvider>
-        </CaptureSettingsProvider>
+        <SplashFadeProvider>
+            <CaptureSettingsProvider>
+                <ARPayloadProvider>
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                        <StatusBar hidden />
+                        <Stack
+                            screenOptions={{
+                                headerShown: false,
+                            }}
+                        />
+                        {/* Splash global sobreposto */}
+                        <GlobalSplashOverlay />
+                    </GestureHandlerRootView>
+                </ARPayloadProvider>
+            </CaptureSettingsProvider>
+        </SplashFadeProvider>
     );
 }

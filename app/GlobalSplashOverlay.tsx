@@ -1,22 +1,15 @@
-import React, { useEffect, useState } from "react";
-import { View, Animated, Image } from "react-native";
-import { useRouter } from "expo-router";
+import React, { useEffect } from "react";
+import { Animated, View, Image } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { ThemedText } from "../components/ThemedText";
 import { Colors } from "../constants/Colors";
 import { useSplashFade } from "../context/SplashFadeContext";
 
-// Esconde o cabeçalho da Stack para esta página
-export const options = {
-    headerShown: false,
-};
-
-export default function Splash() {
-    const [progress, setProgress] = useState(0);
-    const fadeAnim = useState(new Animated.Value(1))[0];
-    const router = useRouter();
-    const logo = require("../assets/images/logo-splash.png");
+export default function GlobalSplashOverlay() {
+    const [progress, setProgress] = React.useState(0);
+    const slideAnim = React.useState(new Animated.Value(0))[0]; // 0 = tela cheia, 1 = fora da tela
     const { cameraReady } = useSplashFade();
+    const logo = require("../assets/images/logo-splash.png");
 
     useEffect(() => {
         let animationFrameId: number | undefined;
@@ -35,25 +28,37 @@ export default function Splash() {
     }, []);
 
     useEffect(() => {
-        if (progress >= 100) {
-            router.replace("/_tabs/recognizer");
-        }
-    }, [progress, router]);
-
-    useEffect(() => {
-        if (cameraReady) {
-            Animated.timing(fadeAnim, {
-                toValue: 0,
+        if (progress >= 100 && cameraReady) {
+            Animated.timing(slideAnim, {
+                toValue: 1,
                 duration: 600,
                 useNativeDriver: true,
             }).start();
         }
-    }, [cameraReady, fadeAnim]);
+    }, [progress, cameraReady, slideAnim]);
 
-    return (
-        <>
-            <StatusBar hidden />
-            <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+    // Só renderiza se não terminou o slide
+    if (progress < 100 || !cameraReady || slideAnim.__getValue() < 1) {
+        return (
+            <Animated.View
+                style={{
+                    flex: 1,
+                    position: 'absolute',
+                    width: '100%',
+                    height: '100%',
+                    zIndex: 999,
+                    transform: [
+                        {
+                            translateX: slideAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [0, -1000], // desliza para a esquerda
+                            })
+                        }
+                    ]
+                }}
+                pointerEvents="none"
+            >
+                <StatusBar hidden />
                 <View
                     style={{
                         flex: 1,
@@ -65,7 +70,6 @@ export default function Splash() {
                     accessible
                     accessibilityLabel="Tela de carregamento OlinxRA"
                 >
-
                     <Image
                         source={logo}
                         style={{
@@ -79,7 +83,6 @@ export default function Splash() {
                     <ThemedText style={{ marginTop: 10, fontSize: 19, color: Colors.global.light }}>
                         Reconheça • Localize • Explore
                     </ThemedText>
-
                     <View
                         style={{
                             position: "absolute",
@@ -105,6 +108,7 @@ export default function Splash() {
                     </View>
                 </View>
             </Animated.View>
-        </>
-    );
+        );
+    }
+    return null;
 }
