@@ -1,5 +1,4 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { useLocalSearchParams } from "expo-router";
 import { useSplashFade } from "../../../context/SplashFadeContext";
 import { useCaptureSettings } from '../../../context/CaptureSettingsContext';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, Dimensions } from "react-native";
@@ -30,8 +29,7 @@ const headerTitle = "Capturar Logomarca";
 type ImageSourceType = 'camera' | 'gallery' | null;
 
 export default function RecognizerHome() {
-            const { setCameraReady } = useSplashFade();
-        const params = useLocalSearchParams();
+    const { setCameraReady } = useSplashFade();
     const { showOrientation } = useCaptureSettings();
     // Tipagem correta para useRef (não é preciso usar 'any' para a CameraView)
     const cameraRef = useRef<CameraView>(null);
@@ -116,7 +114,52 @@ export default function RecognizerHome() {
                 return;
             }
             const photo = await cameraRef.current.takePictureAsync();
-            setCapturedImage(photo.uri);
+
+            // Crop na área dos marcadores para enviar ao backend
+            try {
+                const { manipulateAsync, SaveFormat } = await import('expo-image-manipulator');
+                const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+                // Dimensões dos marcadores (CameraMarkers.tsx)
+                const MARKER_WIDTH = 300;
+                const MARKER_HEIGHT = 250;
+
+                // Calcular escala entre foto e tela
+                const scaleX = photo.width / screenWidth;
+                const scaleY = photo.height / screenHeight;
+
+                // Posição dos marcadores na tela
+                const markerX = (screenWidth - MARKER_WIDTH) / 2;
+                const markerY = (screenHeight - MARKER_HEIGHT) / 2;
+
+                // Converter para coordenadas da foto
+                const cropX = Math.round(markerX * scaleX);
+                const cropY = Math.round(markerY * scaleY);
+                const cropWidth = Math.round(MARKER_WIDTH * scaleX);
+                const cropHeight = Math.round(MARKER_HEIGHT * scaleY);
+
+                // Crop exato da área dos marcadores
+                const croppedImage = await manipulateAsync(
+                    photo.uri,
+                    [
+                        {
+                            crop: {
+                                originX: cropX,
+                                originY: cropY,
+                                width: cropWidth,
+                                height: cropHeight,
+                            },
+                        },
+                    ],
+                    { compress: 1.0, format: SaveFormat.JPEG }
+                );
+
+                setCapturedImage(croppedImage.uri);
+            } catch (error) {
+                console.warn('[Recognizer] Falha ao crop, usando imagem original:', error);
+                setCapturedImage(photo.uri);
+            }
+
             setImageSource('camera');
             setModalVisible(true);
             setIsProcessing(false);

@@ -425,7 +425,15 @@ export function ImageDecisionModal({
             {showNoContentModal && <NoContentToDisplayModal visible={showNoContentModal} onCancel={handleNoContentCancel} brand={noContentBrand} location={noContentLocation} />}
             <Modal visible={visible} transparent={false} animationType="slide" statusBarTranslucent={true}>
                 <View style={styles.overlay}>
-                    <Image source={{ uri: imageUri }} style={{ width: imageWidth, height: imageWidth / 1.25, borderRadius: 12 }} />
+                    <Image
+                        source={{ uri: imageUri }}
+                        style={{
+                            width: imageWidth,
+                            height: imageWidth / 1.2,
+                            borderRadius: 12
+                        }}
+                        resizeMode="cover"
+                    />
                     <View style={styles.buttonContainer}>
                         <Pressable style={styles.fullButton} onPress={handleCompare}>
                             <MaterialIcons name="search" color={Colors.global.light} size={24} style={styles.icon} />

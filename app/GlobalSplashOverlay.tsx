@@ -1,7 +1,6 @@
 import React, { useEffect } from "react";
 import { Animated, View, Image } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { ThemedText } from "../components/ThemedText";
 import { Colors } from "../constants/Colors";
 import { useSplashFade } from "../context/SplashFadeContext";
 
@@ -38,7 +37,7 @@ export default function GlobalSplashOverlay() {
     }, [progress, cameraReady, slideAnim]);
 
     // Só renderiza se não terminou o slide
-    if (progress < 100 || !cameraReady || slideAnim.__getValue() < 1) {
+    if (progress < 100 || !cameraReady) {
         return (
             <Animated.View
                 style={{
@@ -80,9 +79,6 @@ export default function GlobalSplashOverlay() {
                         }}
                         accessibilityLabel="Logo OlinxRA"
                     />
-                    <ThemedText style={{ marginTop: 10, fontSize: 19, color: Colors.global.light }}>
-                        Reconheça • Localize • Explore
-                    </ThemedText>
                     <View
                         style={{
                             position: "absolute",
