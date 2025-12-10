@@ -1,14 +1,17 @@
-# OlinxRA Mobile App
+# Olinx Plus Mobile App
 
 <div align="center">
 
-**Aplicativo de Realidade Aumentada com Reconhecimento Visual**
+**Aplicativo de Realidade Aumentada com Reconhecimento Visual de Logos**
 
 [![Expo](https://img.shields.io/badge/Expo-54-000020.svg?logo=expo&logoColor=white)](https://expo.dev/)
-[![React Native](https://img.shields.io/badge/React%20Native-0.76-61DAFB.svg?logo=react&logoColor=white)](https://reactnative.dev/)
+[![React Native](https://img.shields.io/badge/React%20Native-0.76.5-61DAFB.svg?logo=react&logoColor=white)](https://reactnative.dev/)
+[![React](https://img.shields.io/badge/React-19-61DAFB.svg?logo=react&logoColor=white)](https://react.dev/)
 [![Three.js](https://img.shields.io/badge/Three.js-R3F-000000.svg?logo=three.js&logoColor=white)](https://threejs.org/)
 
-Experiência AR imersiva com reconhecimento de logos e visualização 3D
+Experiência AR imersiva com reconhecimento de logos via CLIP e visualização 3D nativa
+
+[Documentação](https://github.com/gibadalcin/olinxplus-docs) • [Backend API](https://github.com/gibadalcin/olinxplus-backend) • [Admin UI](https://github.com/gibadalcin/olinxplus-adminui)
 
 </div>
 
@@ -16,13 +19,14 @@ Experiência AR imersiva com reconhecimento de logos e visualização 3D
 
 ## 📋 Visão Geral
 
-OlinxRA Mobile App é um aplicativo cross-platform (iOS/Android) que permite aos usuários:
+Olinx Plus Mobile App é um aplicativo cross-platform (iOS/Android) que permite aos usuários:
 
-- 📷 **Capturar Logos**: Detecção automática através da câmera
-- 🔍 **Reconhecimento Visual**: Identificação de marcas usando IA
-- 🌟 **Visualizar AR**: Experiências de realidade aumentada com modelos 3D
-- 📍 **Conteúdo Contextual**: Baseado em localização e marca
-- 💾 **Modo Offline**: Cache inteligente de logos e conteúdo
+- 📷 **Captura Guiada**: Marcadores visuais (300x250px) para enquadramento preciso de logos
+- 🔍 **Reconhecimento Visual IA**: Identificação de marcas usando CLIP + FAISS (~85-90% taxa de sucesso)
+- 🌟 **AR Nativo**: Realidade aumentada com Expo GL + React Three Fiber (ARCore/ARKit)
+- 📍 **Conteúdo Contextual**: Baseado em localização GPS e marca reconhecida
+- 💾 **Modo Offline**: Cache inteligente de logos e conteúdo (AsyncStorage, TTL 30min)
+- ⚡ **Performance**: Crop app-side, imagens otimizadas, loading com dicas educativas
 
 ## 🚀 Quick Start
 
@@ -46,9 +50,10 @@ OlinxRA Mobile App é um aplicativo cross-platform (iOS/Android) que permite aos
 
 ### Instalação
 
-1. **Navegue até o diretório**
+1. **Clone o repositório**
 ```bash
-cd olinxra-app
+git clone https://github.com/gibadalcin/olinxplus.git
+cd olinxplus
 ```
 
 2. **Instale as dependências**
@@ -58,7 +63,7 @@ npm install
 
 3. **Configure o Firebase**
 
-Crie o arquivo `firebaseConfig.ts`:
+Crie o arquivo `firebaseConfig.ts` na raiz:
 
 ```typescript
 import { initializeApp } from 'firebase/app';
@@ -66,17 +71,18 @@ import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "sua-api-key",
+  apiKey: "AIza...",
   authDomain: "seu-projeto.firebaseapp.com",
-  projectId: "seu-projeto",
+  projectId: "seu-projeto-id",
   storageBucket: "seu-projeto.appspot.com",
   messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef"
+  appId: "1:123456789:web:abcdef123456"
 };
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+export default app;
 ```
 
 4. **Configure a API**
@@ -85,18 +91,26 @@ Edite `config/api.ts`:
 
 ```typescript
 export const API_BASE_URL = __DEV__ 
-  ? 'http://localhost:8000'  // Desenvolvimento
-  : 'https://api.olinxra.com'; // Produção
+  ? 'http://192.168.1.100:8000'  // Use seu IP local, não localhost
+  : 'https://your-backend.ondigitalocean.app'; // Backend Digital Ocean
 ```
+
+**Importante:** Para testar no dispositivo físico, use o IP da máquina onde o backend está rodando, não `localhost`.
 
 5. **Inicie o Expo**
 ```bash
-npm start
+npx expo start
 ```
 
-Escaneie o QR code com:
-- **iOS**: Câmera nativa
-- **Android**: App Expo Go
+Opções:
+- Pressione `a` para abrir no Android Emulator
+- Pressione `i` para abrir no iOS Simulator
+- Escaneie QR code com Expo Go (dispositivo físico)
+- Pressione `w` para abrir no navegador (web)
+
+**Para dispositivo físico:**
+- **iOS**: Abra a câmera nativa e escaneie o QR code
+- **Android**: Instale Expo Go e escaneie o QR code
 
 ## 📱 Funcionalidades
 
@@ -230,69 +244,80 @@ if (cached) {
 ## 🏗️ Arquitetura
 
 ```
-olinxra-app/
-├── app/                       # Expo Router (navegação)
-│   ├── _layout.tsx            # Layout raiz
-│   ├── index.tsx              # Tela inicial
-│   │
-│   └── (tabs)/                # Tab navigation
-│       ├── index.tsx          # Home (captura)
-│       ├── history.tsx        # Histórico
-│       └── profile.tsx        # Perfil
+olinxplus/
+├── app/                          # Expo Router (file-based routing)
+│   ├── _layout.tsx               # Root layout com GlobalSplashOverlay
+│   ├── index.tsx                 # Splash inicial com logo animado
+│   └── _tabs/                    # Navegação principal (5 tabs)
+│       ├── _layout.tsx
+│       ├── index.tsx             # Home (Dashboard)
+│       ├── camera.tsx            # Captura guiada com marcadores
+│       ├── ar.tsx                # Visualização AR (Expo GL)
+│       ├── explore.tsx           # Explorar conteúdos
+│       └── profile.tsx           # Perfil do usuário
 │
-├── components/                # Componentes React Native
-│   ├── ar/                    # Componentes AR
-│   │   ├── ARViewer.tsx       # Visualizador 3D
-│   │   └── ModelLoader.tsx    # Carregador GLB
-│   │
-│   ├── ui/                    # UI components
-│   │   ├── CustomButton.tsx
-│   │   ├── LoadingSpinner.tsx
-│   │   └── ...
-│   │
-│   └── ContentBlocks.tsx      # Renderizador de blocos
+├── components/
+│   ├── CustomHeader.tsx          # Header com status WiFi/GPS/Bateria
+│   ├── CustomTabBar.tsx          # Tab bar customizada
+│   ├── ContentBlocks.tsx         # Renderiza blocos dinâmicos
+│   ├── ThemedText.tsx            # Texto com suporte a tema
+│   ├── ThemedView.tsx            # View com suporte a tema
+│   ├── ar/                       # Componentes AR
+│   │   ├── ARCanvas.tsx          # Expo GL + React Three Fiber
+│   │   ├── ModelLoader.tsx       # Carrega modelos GLB
+│   │   ├── ARSceneControls.tsx   # Controles de zoom/rotação
+│   │   └── ImageMarkerTracker.tsx
+│   └── ui/
+│       ├── GlobalSplashOverlay.tsx  # Loading global com dicas
+│       ├── CameraMarkers.tsx        # Guias visuais 300x250px
+│       ├── LoadingOverlay.tsx
+│       └── ErrorBoundary.tsx
 │
-├── hooks/                     # Custom hooks
-│   ├── useARContent.ts        # Gerenciar conteúdo AR
-│   ├── useARSupport.ts        # Verificar suporte AR
-│   ├── useLogoCache.ts        # Cache de logos
-│   ├── useLogoCompare.ts      # Comparação visual
-│   └── useHistory.ts          # Histórico de buscas
+├── context/                          # React Context
+│   ├── ARPayloadContext.tsx          # Estado AR global (marca, logo, conteúdo)
+│   └── CaptureSettingsContext.tsx    # Configurações de captura
 │
-├── context/                   # React Context
-│   ├── ARPayloadContext.tsx   # Estado AR global
-│   └── CaptureSettingsContext.tsx
+├── hooks/                            # Custom hooks
+│   ├── useARSupport.ts               # Detecta ARCore/ARKit
+│   ├── useARContent.ts               # Fetch logo + conteúdo da marca
+│   ├── useImageRecognition.ts        # Envio para backend reconhecimento
+│   ├── useOfflineCache.ts            # AsyncStorage com TTL 30min
+│   └── useColorScheme.ts             # Tema dark/light
 │
 ├── config/
-│   └── api.ts                 # Configuração da API
+│   └── api.ts                        # API_BASE_URL (Digital Ocean)
 │
-├── utils/                     # Utilitários
-│   ├── imageProcessing.ts     # Redimensionamento
-│   ├── storage.ts             # AsyncStorage helpers
-│   └── ...
+├── constants/
+│   └── Colors.ts                     # Paleta de cores tema
 │
-├── assets/                    # Assets estáticos
-│   ├── images/
-│   └── fonts/
+├── utils/
+│   ├── imageProcessor.ts             # Crop 300x250px, resize
+│   ├── cacheManager.ts               # Gerencia AsyncStorage
+│   └── networkMonitor.ts             # Status conectividade
 │
-└── package.json
+├── assets/
+│   └── images/                       # Imagens estáticas
+│
+├── firebaseConfig.ts                 # Configuração Firebase
+├── app.json                          # Configuração Expo
+└── package.json                      # Dependências (Expo 54, React Native 0.76.5)
 ```
 
 ## 🔧 Componentes Principais
 
-### ARViewer.tsx
+### ARCanvas.tsx
 
-Componente principal de visualização AR:
+Visualizador AR com Expo GL + React Three Fiber:
 
 ```typescript
-import { Canvas } from '@react-three/fiber';
-import { useGLTF } from '@react-three/drei';
+import { Canvas } from '@react-three/fiber/native';
+import { useGLTF } from '@react-three/drei/native';
 
-export function ARViewer({ modelUrl }: { modelUrl: string }) {
+export function ARCanvas({ modelUrl }: { modelUrl: string }) {
   return (
-    <Canvas>
-      <ambientLight intensity={0.5} />
-      <pointLight position={[10, 10, 10]} />
+    <Canvas gl={{ physicallyCorrectLights: true }}>
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[5, 5, 5]} intensity={0.8} castShadow />
       <Model url={modelUrl} />
     </Canvas>
   );
@@ -300,13 +325,44 @@ export function ARViewer({ modelUrl }: { modelUrl: string }) {
 
 function Model({ url }: { url: string }) {
   const { scene } = useGLTF(url);
-  return <primitive object={scene} />;
+  return <primitive object={scene} scale={1.5} />;
 }
+```
+
+### CameraMarkers.tsx
+
+Marcadores visuais para captura guiada (300x250px):
+
+```typescript
+export function CameraMarkers() {
+  return (
+    <View style={styles.overlay}>
+      <View style={styles.markerFrame}>
+        {/* Cantos do frame guia */}
+        <View style={[styles.corner, styles.topLeft]} />
+        <View style={[styles.corner, styles.topRight]} />
+        <View style={[styles.corner, styles.bottomLeft]} />
+        <View style={[styles.corner, styles.bottomRight]} />
+        <Text style={styles.hint}>Centralize o logo aqui</Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  markerFrame: {
+    width: 300,
+    height: 250,
+    borderWidth: 2,
+    borderColor: '#00FF00',
+    // ... estilos adicionais
+  }
+});
 ```
 
 ### ContentBlocks.tsx
 
-Renderizador universal de blocos:
+Renderizador universal de blocos dinâmicos:
 
 ```typescript
 export function ContentBlocks({ blocos }: { blocos: Bloco[] }) {
@@ -548,16 +604,28 @@ eas build --profile production --platform ios
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
       },
       "ios": {
-        "bundleIdentifier": "com.olinxra.app"
+        "bundleIdentifier": "com.olinxplus.app"
       }
     }
+  },
+  "submit": {
+    "production": {}
   }
 }
 ```
@@ -612,9 +680,16 @@ eas submit --platform ios
 
 - [Teste de Fluxo AR](TESTE-FLUXO-AR.md)
 - [Histórico AR Android](HISTORICO-AR-ANDROID.md)
+- [Correção Delay Imagem](CORRECAO-DELAY-IMAGEM.md)
 - [Expo Documentation](https://docs.expo.dev/)
 - [React Native](https://reactnative.dev/)
 - [React Three Fiber](https://docs.pmnd.rs/react-three-fiber)
+
+## 🔗 Repositórios Relacionados
+
+- **Backend API**: [olinxplus-backend](https://github.com/gibadalcin/olinxplus-backend) - FastAPI + CLIP ONNX + FAISS
+- **Admin Dashboard**: [olinxplus-adminui](https://github.com/gibadalcin/olinxplus-adminui) - React + MUI
+- **Documentação**: [olinxplus-docs](https://github.com/gibadalcin/olinxplus-docs) - Guias técnicos
 
 ## 🤝 Contribuindo
 
