@@ -1,4 +1,4 @@
-# 🧪 Guia de Teste - Fluxo AR OlinxRA
+# 🧪 Guia de Teste - Fluxo AR Olinx Plus
 
 ## 📋 Checklist de Correções Aplicadas
 
@@ -15,7 +15,7 @@
 ### 1. Iniciar o Servidor de Desenvolvimento
 
 ```bash
-cd d:\OlinxRA\olinxra-app
+cd d:\Olinxplus\olinxplus
 npm start
 ```
 
